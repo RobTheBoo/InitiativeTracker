@@ -239,11 +239,55 @@
     })[c]);
   }
 
+  // ----- Setup automatico (one-shot) -----
+  // Sfoglia (o usa il path attuale) -> POST /api/folder/setup -> crea struttura + salva.
+  async function quickSetup() {
+    let folderPath = $('folder-path-input').value.trim();
+    if (isElectron) {
+      try {
+        const r = await window.electronAPI.pickFolder({
+          title: 'Scegli la cartella di lavoro (puoi puntarla dentro OneDrive/Drive)',
+          defaultPath: folderPath || undefined
+        });
+        if (r && !r.canceled && r.folderPath) folderPath = r.folderPath;
+        else if (!folderPath) return; // utente ha annullato e non c'era nulla
+      } catch (e) {
+        alert('Errore selettore: ' + e.message);
+        return;
+      }
+    } else if (!folderPath) {
+      const typed = prompt('Inserisci il percorso completo della cartella di lavoro:');
+      if (!typed) return;
+      folderPath = typed.trim();
+    }
+
+    setStatusLine('⏳ Inizializzazione struttura cartella…', 'var(--accent-gold)');
+    try {
+      const data = await apiPost('/api/folder/setup', { folderPath, autoExport: true, doExport: true });
+      $('folder-path-input').value = data.folderPath;
+      $('folder-auto-export').checked = true;
+      const created = (data.structureCreated && data.structureCreated.created) || [];
+      const exp = data.exportResult || {};
+      const lines = [
+        '✅ Setup completato: ' + data.folderPath,
+        created.length ? `📁 ${created.length} sottocartelle create` : '📁 Struttura gia\u0027 esistente',
+        exp.rooms ? `📤 Esportate ${exp.rooms.written} stanze, ${exp.images.copied} immagini` : ''
+      ].filter(Boolean);
+      showResultModal('✨ Setup automatico', lines.join('\n'));
+      await refreshStatus();
+    } catch (e) {
+      setStatusLine('❌ Setup fallito: ' + e.message, '#ff6b6b');
+    }
+  }
+
   // ----- Bind -----
   function bind() {
     if (isElectron && $('folder-browse-btn')) {
       $('folder-browse-btn').style.display = '';
       $('folder-browse-btn').addEventListener('click', browse);
+    }
+    if ($('folder-setup-quick-btn')) {
+      $('folder-setup-quick-btn').addEventListener('click', quickSetup);
     }
     $('folder-test-btn').addEventListener('click', testFolder);
     $('folder-save-btn').addEventListener('click', saveConfig);

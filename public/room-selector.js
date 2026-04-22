@@ -461,17 +461,15 @@ function tryLoadServerIP() {
     serverIpElement.textContent = 'http://localhost:3001';
   }
   
-  if (isElectron && window.electronAPI && window.electronAPI.getServerIP) {
-    loadServerIP().catch(err => {
-      console.warn('⚠️ Tentativo caricamento IP fallito:', err);
-      if (ipLoadAttempts < maxAttempts) {
-        setTimeout(tryLoadServerIP, 1000);
-      }
-    });
-  } else if (ipLoadAttempts < maxAttempts) {
-    // Se Electron API non è ancora disponibile, riprova
-    setTimeout(tryLoadServerIP, 500);
-  }
+  // loadServerIP() ha già il fallback browser (usa /api/server-info -> origin),
+  // quindi va chiamata sia in Electron che in browser. Il vecchio gate isElectron
+  // bloccava la chiamata in browser e l'<img> del QR restava senza src.
+  loadServerIP().catch(err => {
+    console.warn('⚠️ Tentativo caricamento IP fallito:', err);
+    if (ipLoadAttempts < maxAttempts) {
+      setTimeout(tryLoadServerIP, 1000);
+    }
+  });
 }
 
 // Primo tentativo immediato

@@ -80,6 +80,46 @@ function registerFolderRoutes(app, paths, configStore, db) {
     res.json(result);
   });
 
+  // ----- Setup one-shot: crea cartella + struttura + salva path + auto-export ON -----
+  // Usato dal "wizard primo avvio" e dal pulsante "Setup automatico" in config.
+  // Body: { folderPath, autoExport?:bool=true, doExport?:bool=true }
+  // Returns: { ok, folderPath, structureCreated, exportResult? }
+  app.post('/api/folder/setup', async (req, res) => {
+    const folderPath = (req.body && req.body.folderPath || '').trim();
+    const autoExport = req.body && typeof req.body.autoExport === 'boolean' ? req.body.autoExport : true;
+    const doExport = req.body && typeof req.body.doExport === 'boolean' ? req.body.doExport : true;
+    if (!folderPath) return res.status(400).json({ error: 'folderPath richiesto' });
+
+    try {
+      const usable = folderSync.isFolderUsable(folderPath);
+      if (!usable.ok) return res.status(400).json({ error: usable.error });
+
+      const structure = folderSync.scaffoldFolder(folderPath);
+
+      let exportResult = null;
+      if (doExport) {
+        exportResult = await folderSync.exportFolder(folderPath, deps);
+      }
+
+      store.update(c => {
+        c.folderPath = folderPath;
+        c.autoExport = autoExport;
+        c.lastExportAt = doExport ? Date.now() : c.lastExportAt;
+        return c;
+      });
+
+      res.json({
+        ok: true,
+        folderPath,
+        structureCreated: structure,
+        exportResult
+      });
+    } catch (e) {
+      console.error('❌ /api/folder/setup:', e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // ----- Analyze import (preview, no side effect) -----
   app.post('/api/folder/analyze-import', (req, res) => {
     const folderPath = (req.body && req.body.folderPath) || store.load().folderPath;

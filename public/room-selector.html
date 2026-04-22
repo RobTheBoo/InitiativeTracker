@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="ui-enhancements.css">
   <link rel="stylesheet" href="responsive.css">
   <link rel="stylesheet" href="theme-light.css">
-  <link rel="stylesheet" href="premium-ui.css">
+  <link rel="stylesheet" href="premium-ui.css?v=3">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Text:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script defer src="theme-toggle.js"></script>
   <style>
@@ -241,7 +241,132 @@
     </div>
   </div>
 
-  <script src="room-selector.js"></script>
+  <!-- Wizard primo avvio: scegliere la cartella di lavoro (anche dentro OneDrive/Drive) -->
+  <div id="folder-setup-modal" class="setup-overlay" style="display:none;">
+    <div class="setup-card" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+      <header class="setup-header">
+        <h2 id="setup-title">📁 Dove vuoi salvare i tuoi dati?</h2>
+        <p class="setup-sub">
+          L'app userà <strong>una cartella sul tuo PC</strong> per personaggi, stanze e immagini.
+          Se la metti dentro <strong>OneDrive</strong>, <strong>Google Drive</strong> o <strong>Dropbox</strong>,
+          i dati si sincronizzano da soli su tutti i tuoi dispositivi.
+        </p>
+      </header>
+
+      <div class="setup-body">
+        <label class="setup-label" for="setup-path-input">Percorso della cartella:</label>
+        <div class="setup-row">
+          <input id="setup-path-input" class="setup-input" type="text"
+                 placeholder="es. C:\Users\TuoNome\OneDrive\RPG-Tracker">
+          <button id="setup-browse-btn" class="btn secondary" style="display:none;">📂 Sfoglia…</button>
+        </div>
+        <div id="setup-hint" class="setup-hint">
+          Suggerimento: scegli una cartella che non esiste ancora — l'app la crea con la struttura giusta
+          (<code>images/heroes</code>, <code>images/enemies</code>, ecc.).
+        </div>
+        <div id="setup-status" class="setup-status" style="display:none;"></div>
+      </div>
+
+      <footer class="setup-footer">
+        <button id="setup-skip-btn" class="btn secondary">Salta per ora</button>
+        <button id="setup-confirm-btn" class="btn primary large">✨ Crea e usa questa cartella</button>
+      </footer>
+    </div>
+  </div>
+
+  <style>
+    .setup-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+      animation: setup-fade 240ms ease-out;
+    }
+    @keyframes setup-fade { from { opacity: 0; } to { opacity: 1; } }
+    .setup-card {
+      width: min(640px, 100%);
+      background: linear-gradient(180deg, rgba(30,30,50,0.98), rgba(20,20,35,0.98));
+      border: 1px solid rgba(212,175,55,0.45);
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 30px rgba(212,175,55,0.18);
+      color: var(--text-light, #f0e8d8);
+    }
+    .setup-header h2 {
+      font-family: 'Cinzel', Georgia, serif;
+      color: var(--accent-gold, #f0c674);
+      margin: 0 0 8px 0;
+      font-size: 1.5rem;
+    }
+    .setup-sub {
+      margin: 0 0 18px 0;
+      color: var(--text-muted, #c9bda0);
+      line-height: 1.55;
+      font-size: 0.95rem;
+    }
+    .setup-label {
+      display: block;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .setup-row {
+      display: flex; gap: 8px; flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .setup-input {
+      flex: 1; min-width: 260px;
+      padding: 12px 14px;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(212,175,55,0.35);
+      border-radius: 8px;
+      color: var(--text-light);
+      font-family: 'Courier New', monospace;
+      font-size: 0.95rem;
+    }
+    .setup-input:focus {
+      outline: none;
+      border-color: var(--accent-gold);
+      box-shadow: 0 0 0 3px rgba(212,175,55,0.2);
+    }
+    .setup-hint {
+      font-size: 0.85rem;
+      color: var(--text-dim, #8e8267);
+      margin: 6px 0 14px 0;
+      line-height: 1.5;
+    }
+    .setup-hint code {
+      background: rgba(0,0,0,0.4);
+      padding: 1px 6px;
+      border-radius: 4px;
+      color: var(--accent-gold);
+    }
+    .setup-status {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      margin: 12px 0;
+      white-space: pre-line;
+    }
+    .setup-status.ok { background: rgba(60,180,90,0.15); color: #9be7a8; border: 1px solid rgba(60,180,90,0.4); }
+    .setup-status.err { background: rgba(220,80,80,0.15); color: #ff9a9a; border: 1px solid rgba(220,80,80,0.4); }
+    .setup-status.busy { background: rgba(212,175,55,0.12); color: var(--accent-gold); border: 1px solid rgba(212,175,55,0.35); }
+    .setup-footer {
+      display: flex; justify-content: flex-end; gap: 10px;
+      margin-top: 18px;
+    }
+    @media (max-width: 540px) {
+      .setup-card { padding: 20px; border-radius: 12px; }
+      .setup-footer { flex-direction: column-reverse; }
+      .setup-footer .btn { width: 100%; }
+    }
+  </style>
+
+  <script src="room-selector.js?v=3"></script>
+  <script src="folder-setup-wizard.js?v=3"></script>
 </body>
 </html>
 

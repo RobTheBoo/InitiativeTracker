@@ -26,6 +26,27 @@ function ensureDir(p) {
   return p;
 }
 
+// Crea (idempotente) la struttura di sottocartelle attesa, senza toccare file esistenti.
+// Usato dal wizard "primo avvio" per inizializzare velocemente la cartella di lavoro.
+// Returns: { folderPath, created: [paths], existing: [paths] }
+function scaffoldFolder(folderPath) {
+  const created = [];
+  const existing = [];
+  const targets = [
+    folderPath,
+    path.join(folderPath, 'rooms'),
+    path.join(folderPath, 'images'),
+    ...SUBFOLDERS.map(s => path.join(folderPath, 'images', s))
+  ];
+  for (const t of targets) {
+    if (fs.existsSync(t)) existing.push(t);
+    else { fs.mkdirSync(t, { recursive: true }); created.push(t); }
+  }
+  // README sempre rigenerato (auto-generato)
+  fs.writeFileSync(path.join(folderPath, 'README.md'), generateReadme(), 'utf8');
+  return { folderPath, created, existing };
+}
+
 function isFolderUsable(folderPath) {
   if (!folderPath || typeof folderPath !== 'string') return { ok: false, error: 'Path vuoto' };
   try {
@@ -377,6 +398,7 @@ ogni volta che modifichi config o stato delle stanze (debounced 3s).
 
 module.exports = {
   isFolderUsable,
+  scaffoldFolder,
   readManifest,
   exportFolder,
   analyzeImport,

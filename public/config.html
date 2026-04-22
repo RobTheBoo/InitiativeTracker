@@ -269,8 +269,21 @@
           Punta l'app a <strong>una cartella locale</strong> (anche dentro <strong>OneDrive</strong>, <strong>Google Drive</strong> o <strong>Dropbox</strong> sincronizzata sul PC).
           L'app legge e scrive li' usando una struttura standard, cosi' puoi <strong>condividere personaggi e stanze tra piu' PC</strong> senza configurare niente.
           <br><strong>Vantaggi</strong>: zero OAuth, zero credenziali Microsoft/Google, zero quota limitata, funziona anche offline.
-          <br><strong>Suggerimento</strong>: usa una cartella tipo <code>OneDrive/RPG-Tracker/</code> e l'OS si occupa della sync automatica.
         </p>
+
+        <!-- Setup automatico: un solo click -->
+        <div class="folder-card" style="background: linear-gradient(135deg, rgba(212,175,55,0.10), rgba(0,0,0,0.20)); border: 1px solid rgba(212,175,55,0.45); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+          <h3 style="color: var(--accent-gold); margin-bottom: 8px;">✨ Setup automatico</h3>
+          <p style="color: var(--text-light); margin: 0 0 12px 0; font-size: 0.95rem; line-height: 1.55;">
+            Scegli (o crea) una cartella e l'app la inizializza con tutte le sottocartelle giuste
+            (<code>images/heroes</code>, <code>images/enemies</code>, <code>images/allies</code>,
+            <code>images/summons</code>, <code>rooms</code>) e attiva la sync automatica.
+            Niente da configurare a mano.
+          </p>
+          <button class="btn primary large" id="folder-setup-quick-btn">
+            ⚡ Imposta cartella di lavoro
+          </button>
+        </div>
 
         <!-- Card path corrente -->
         <div class="folder-card" style="background: var(--bg-dark); border: 1px solid var(--border-gold); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
