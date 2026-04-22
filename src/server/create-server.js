@@ -15,6 +15,7 @@ const { buildPaths, getLocalIPs, getPrimaryLocalIP } = require('./paths');
 const { ConfigStore } = require('./config-store');
 const { loadLibrary } = require('./library');
 const { startMdns, stopMdns } = require('./mdns');
+const { registerCloudRoutes } = require('../cloud/cloud-routes');
 
 function createServer(opts = {}) {
   const paths = buildPaths(opts);
@@ -190,8 +191,12 @@ function createServer(opts = {}) {
     res.json(fromConfig.length > 0 ? fromConfig : readImagesFolder('allies'));
   });
 
+  // ----- Cloud routes (OneDrive) -----
+  // Registrate PRIMA di registerConfigRoutes cosi' le route di upload possono usare pushSingleFile
+  const cloud = registerCloudRoutes(app, paths, configStore);
+
   // ----- Config CRUD (heroes / enemies / allies / summons / effects) -----
-  registerConfigRoutes(app, configStore, paths);
+  registerConfigRoutes(app, configStore, paths, cloud);
 
   // ----- Socket.IO: clientId persistente per gestione robusta dei reclaim -----
   io.on('connection', (socket) => {
@@ -244,7 +249,7 @@ function createServer(opts = {}) {
 }
 
 // ----- Routes config CRUD (estratti per non bloatare createServer) -----
-function registerConfigRoutes(app, configStore, paths) {
+function registerConfigRoutes(app, configStore, paths, cloud) {
   function makeUploader(subfolder, idField) {
     const storage = multer.diskStorage({
       destination: (req, file, cb) => cb(null, paths.getImagesPath(subfolder)),
@@ -323,7 +328,7 @@ function registerConfigRoutes(app, configStore, paths) {
 
   function genericUpload(field, subfolder, idField) {
     const uploader = makeUploader(subfolder, idField);
-    return [uploader.single('image'), (req, res) => {
+    return [uploader.single('image'), async (req, res) => {
       const id = req.body[idField];
       if (!req.file) return res.status(400).json({ error: 'Nessun file caricato' });
       // Pulisci versioni con estensioni diverse dello stesso id
@@ -344,6 +349,13 @@ function registerConfigRoutes(app, configStore, paths) {
         else c[field].push({ id, name: id, image: imageUrl });
         return c;
       });
+
+      // Best-effort: se OneDrive e' connesso, carica anche su cloud (non blocca la risposta).
+      if (cloud && typeof cloud.pushSingleFile === 'function') {
+        cloud.pushSingleFile(subfolder, path.basename(req.file.path), req.file.path)
+          .catch(() => {});
+      }
+
       res.json({ success: true, image: imageUrl });
     }];
   }

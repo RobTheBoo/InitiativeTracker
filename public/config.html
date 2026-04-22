@@ -185,6 +185,7 @@
       <button class="config-tab" data-tab="allies">🤝 NPC</button>
       <button class="config-tab" data-tab="effects">✨ Effetti</button>
       <button class="config-tab" data-tab="summons">🔮 Evocazioni</button>
+      <button class="config-tab" data-tab="cloud">☁️ Cloud</button>
     </div>
 
     <!-- Tab Eroi -->
@@ -239,6 +240,95 @@
           <!-- Generato da JavaScript -->
         </div>
         <button class="add-char-btn" onclick="addNewSummon()">+ Aggiungi Evocazione</button>
+      </div>
+    </div>
+
+    <!-- Tab Cloud / OneDrive -->
+    <div id="cloud-tab" class="config-content">
+      <div class="config-section">
+        <h2>☁️ OneDrive Personale</h2>
+        <p style="color: var(--text-light); margin-bottom: 16px; line-height: 1.6;">
+          Carica le immagini di eroi, nemici, alleati ed evocazioni sul tuo OneDrive.
+          Cosi' puoi cambiare PC, formattare, riavviare l'app e ritrovare tutte le immagini.
+          Il database SQLite resta locale (mai su OneDrive: si corromperebbe), solo le immagini vanno in cloud.
+        </p>
+
+        <div id="cloud-status-card" style="background: var(--bg-dark); border: 1px solid var(--border-gold); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+          <div id="cloud-status-loading">Caricamento stato…</div>
+        </div>
+
+        <!-- Setup Azure clientId (una-tantum) -->
+        <details id="cloud-setup-details" style="margin-bottom: 20px;">
+          <summary style="cursor: pointer; color: var(--accent-gold); font-weight: bold; padding: 8px 0;">
+            ⚙️ Setup iniziale (una-tantum) — Registra l'app Azure
+          </summary>
+          <div style="padding: 16px; background: var(--bg-dark); border-radius: 6px; margin-top: 8px;">
+            <p style="color: var(--text-light); line-height: 1.6;">
+              Microsoft richiede di registrare un'<strong>"app"</strong> nel tuo account Azure (gratis, 1 minuto).
+              E' come dare un nome al permesso che concedi: serve solo a tracciare chi puo' accedere ai tuoi file.
+            </p>
+            <ol style="color: var(--text-light); padding-left: 24px; margin: 12px 0; line-height: 1.8;">
+              <li>Vai su <a href="https://portal.azure.com" target="_blank" style="color: var(--accent-gold);">portal.azure.com</a> (login con il tuo Microsoft account)</li>
+              <li>Cerca <strong>"App registrations"</strong> in alto → clic <strong>+ New registration</strong></li>
+              <li>Nome: <code>RPG Tracker</code> (o quello che vuoi)</li>
+              <li>Account types: <strong>"Personal Microsoft accounts only"</strong></li>
+              <li>Redirect URI: lascia vuoto, clicca <strong>Register</strong></li>
+              <li>Vai a <strong>Authentication</strong> → in fondo: <strong>"Allow public client flows" = Sì</strong> → Save</li>
+              <li>Torna su <strong>Overview</strong>, copia il valore di <strong>"Application (client) ID"</strong></li>
+              <li>Incollalo qui sotto:</li>
+            </ol>
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+              <input type="text" id="cloud-client-id-input" placeholder="es. 12345678-1234-1234-1234-123456789abc" 
+                     style="flex: 1; padding: 10px; background: var(--bg-light); border: 1px solid var(--border-gold); border-radius: 4px; color: var(--text-light); font-family: 'Courier New', monospace;" />
+              <button class="btn primary" id="cloud-save-clientid-btn">Salva</button>
+            </div>
+          </div>
+        </details>
+
+        <!-- Pulsanti azione -->
+        <div id="cloud-actions" style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button class="btn primary" id="cloud-connect-btn" style="display:none;">🔐 Connetti OneDrive</button>
+          <button class="btn primary" id="cloud-sync-btn" style="display:none;">⬇️ Scarica da OneDrive</button>
+          <button class="btn secondary" id="cloud-push-btn" style="display:none;">⬆️ Carica tutto su OneDrive</button>
+          <button class="btn danger" id="cloud-disconnect-btn" style="display:none;">⛔ Disconnetti</button>
+        </div>
+
+        <!-- Modal per device code -->
+        <div id="cloud-auth-modal" class="modal" style="display: none;">
+          <div class="modal-content" style="max-width: 520px;">
+            <h3>🔐 Connetti OneDrive</h3>
+            <p style="color: var(--text-light); margin-bottom: 16px;">
+              Apri questo URL in un browser (anche dal telefono va bene):
+            </p>
+            <div style="text-align: center; margin: 16px 0;">
+              <a id="cloud-auth-uri" href="#" target="_blank" 
+                 style="font-size: 1.2rem; color: var(--accent-gold); text-decoration: underline;">
+                microsoft.com/devicelogin
+              </a>
+            </div>
+            <p style="color: var(--text-light); margin-bottom: 8px;">E inserisci questo codice:</p>
+            <div id="cloud-auth-code" style="font-family: 'Courier New', monospace; font-size: 2rem; text-align: center; background: var(--bg-light); padding: 16px; border-radius: 6px; letter-spacing: 4px; color: var(--accent-gold); border: 2px dashed var(--border-gold);">
+              ……………
+            </div>
+            <p id="cloud-auth-status" style="margin-top: 16px; text-align: center; color: var(--text-light);">
+              In attesa dell'autorizzazione…
+            </p>
+            <div class="modal-buttons" style="margin-top: 16px;">
+              <button class="btn secondary" id="cloud-auth-cancel-btn">Annulla</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal output sync -->
+        <div id="cloud-result-modal" class="modal" style="display: none;">
+          <div class="modal-content" style="max-width: 600px;">
+            <h3 id="cloud-result-title">Sync completato</h3>
+            <pre id="cloud-result-body" style="background: var(--bg-light); padding: 12px; border-radius: 6px; max-height: 300px; overflow: auto; white-space: pre-wrap; color: var(--text-light); font-size: 0.85rem;"></pre>
+            <div class="modal-buttons">
+              <button class="btn primary" id="cloud-result-close-btn">OK</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -304,6 +394,7 @@
 
   <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
   <script src="config.js"></script>
+  <script src="cloud.js"></script>
 </body>
 </html>
 
