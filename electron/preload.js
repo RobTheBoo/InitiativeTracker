@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Percorso dati
   getDataPath: () => ipcRenderer.invoke('get-data-path'),
+  openDataFolder: () => ipcRenderer.invoke('open-data-folder'),
   
   // Eventi
   onServerStarted: (callback) => ipcRenderer.on('server-started', (event, data) => callback(data)),
