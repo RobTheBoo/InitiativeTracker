@@ -151,6 +151,15 @@ Dopo ogni fase:
 - Modificati: `public/style.css`, `public/ui-enhancements.css`, `public/index.html`, `public/master.html`, `public/tablet.html`, `public/room-selector.html`, `public/config.html`.
 - Lessons documentate: `tasks/lessons.md` (better-sqlite3 dual-ABI, PowerShell `&&`, Windows file lock, vars CSS non definite, inline `style=` che sovrascrive media query).
 
+### Aggiornamento 2026-04-23 — Onboarding QR/IP per telefono
+
+- Aggiunto **banner connect-helper** in `public/index.html` (player view su `/`) con IP grosso cliccabile (copia in clipboard) + QR a fianco. Si nasconde automaticamente quando si entra in una stanza (sfrutta il fatto che vive dentro `#room-selection.screen`).
+- Script standalone (non dipende da `app.js`): usa `/api/server-info` con timeout 4s e fallback su `window.location.origin`. Robusto in WebView Android.
+- Bug fix: `info.ips` è array di `{name, address, score}` non di stringhe → mappato `.address` prima di mostrare gli IP alternativi.
+- `public/tablet.js`: migrato QR da `api.qrserver.com` (servizio esterno) a `/api/qr` locale → funziona anche offline (tipico setup LAN del DM).
+- Rebuild APK: `npx cap sync android` + `gradlew assembleDebug` (4s incrementale). APK aggiornato in `dist/rpg-tracker-debug.apk` (4.1 MB).
+- `npm test`: **41/41** passati (con server di test su `:3099` attivo prima di lanciarli).
+
 ### Cose rimaste fuori scope (volutamente)
 
 - Sostituzione massiva emoji → SVG Lucide (deciso "mix": emoji RPG-themed restano, Lucide solo per UI di sistema. `theme-toggle.js` espone `getLucideIcon()` per usi futuri).
@@ -164,6 +173,21 @@ Dopo ogni fase:
 3. PWA: `http://rpg-tracker.local:3001` da telefono → "Aggiungi alla schermata Home"
 4. Theme toggle: pulsante fisso top-right su tutte le viste (☀️ ↔ 🌙)
 5. Tablet orient toggle: FAB bottom-right solo su `tablet.html` (🖥️ ↔ 🔄)
+
+### Aggiunta 2026-04-23 — Toggle orientamento per cellulare/APK
+
+**Richiesta**: su tutte le viste, da cellulare/APK, poter forzare l'orientamento
+(verticale o orizzontale) indipendentemente da come l'utente ruota il telefono.
+
+**Implementazione**:
+- FAB bottom-left con 3 stati ciclici: `auto` 🔄 → `portrait` 📱 → `landscape` 📺 → `auto`
+- Persistenza in `localStorage` chiave `rpg-orient-lock`
+- 3 livelli di lock con fallback graduale:
+  1. **Native APK** (Capacitor): plugin `@capacitor/screen-orientation` → `ScreenOrientation.lock()`
+  2. **PWA standalone** (Android Chrome): Web API `screen.orientation.lock()`
+  3. **Fallback**: overlay full-screen "📱 Ruota il telefono" se il device è nell'orientamento sbagliato e i livelli 1+2 hanno fallito
+- Visibilità FAB: solo se `viewport ≤ 768px` OR `Capacitor.isNativePlatform()`, escluso `body.tablet-view` (ha già il suo toggle landscape/responsive)
+- File toccati: `package.json` (+1 dep), `public/theme-toggle.js`, `public/ui-enhancements.css`, `npx cap sync android` + rebuild APK
 
 ### Distribuzione binari (richiesta originale dell'utente)
 

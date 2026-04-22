@@ -300,6 +300,96 @@ body.tablet-view[data-orient-mode="landscape-lock"] {
 }
 .rpg-tablet-mode-toggle-fab:hover { opacity: 1; }
 
+/* Toggle orient-lock per cell/APK: FAB bottom-left, 3 stati ciclici
+   (auto / portrait / landscape). Gli stati sono evidenziati con un alone
+   colorato per dare feedback visivo immediato. */
+.rpg-orient-toggle-fab {
+  position: fixed;
+  bottom: max(var(--sp-3, 12px), env(safe-area-inset-bottom, 12px));
+  left: max(var(--sp-3, 12px), env(safe-area-inset-left, 12px));
+  z-index: var(--z-sticky, 100);
+  box-shadow: var(--sh-3, 0 4px 12px rgba(0,0,0,0.4));
+  opacity: 0.75;
+}
+.rpg-orient-toggle-fab:hover,
+.rpg-orient-toggle-fab:focus-visible { opacity: 1; }
+.rpg-orient-toggle-fab[data-orient-state="portrait"] {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 0 2px var(--accent-gold), var(--sh-3, 0 4px 12px rgba(0,0,0,0.4));
+  opacity: 1;
+}
+.rpg-orient-toggle-fab[data-orient-state="landscape"] {
+  border-color: #6cb4ff;
+  box-shadow: 0 0 0 2px #6cb4ff, var(--sh-3, 0 4px 12px rgba(0,0,0,0.4));
+  opacity: 1;
+}
+
+/* Overlay "ruota il telefono": fallback quando i lock nativi/web sono falliti
+   e l'orientamento fisico non corrisponde a quello richiesto dall'utente.
+   Bloccante visivamente ma non interattivo (eccetto bottone "Sblocca"). */
+.rpg-orient-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal, 1000);
+  background: rgba(10, 10, 18, 0.92);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(var(--sp-4, 16px), env(safe-area-inset-top, 16px))
+           max(var(--sp-4, 16px), env(safe-area-inset-right, 16px))
+           max(var(--sp-4, 16px), env(safe-area-inset-bottom, 16px))
+           max(var(--sp-4, 16px), env(safe-area-inset-left, 16px));
+  text-align: center;
+  color: var(--text-light);
+  animation: rpg-orient-fade-in 180ms ease-out;
+}
+@keyframes rpg-orient-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.rpg-orient-overlay-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-4, 16px);
+  max-width: 320px;
+}
+.rpg-orient-overlay-icon svg {
+  width: 64px;
+  height: 64px;
+  color: var(--accent-gold);
+  animation: rpg-orient-rotate-hint 2.4s ease-in-out infinite;
+}
+@keyframes rpg-orient-rotate-hint {
+  0%, 100% { transform: rotate(0); }
+  50%      { transform: rotate(15deg); }
+}
+.rpg-orient-overlay-msg {
+  font-size: var(--fs-lg, 1.2rem);
+  font-weight: 600;
+  line-height: 1.4;
+}
+.rpg-orient-overlay-dismiss {
+  margin-top: var(--sp-2, 8px);
+  padding: 10px 18px;
+  min-height: var(--touch-min, 44px);
+  border-radius: var(--r-md, 8px);
+  border: 1px solid var(--border-gold);
+  background: transparent;
+  color: var(--text-light);
+  font-size: var(--fs-sm, 0.9rem);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.rpg-orient-overlay-dismiss:hover,
+.rpg-orient-overlay-dismiss:focus-visible {
+  background: var(--accent-gold);
+  color: var(--bg-dark);
+}
+
 /* Slot per theme toggle: in alto a destra nella viewport, fixed.
    Slot è un wrapper minimale, il bottone è figlio iniettato da JS.
    Viene posizionato fuori dal flusso per non spostare il layout esistente. */

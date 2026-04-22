@@ -28,6 +28,8 @@
     monitor: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
     rotate: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3.51-7.13"/><path d="M21 5v5h-5"/></svg>',
     smartphone: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>',
+    smartphoneLandscape: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M18 12h.01"/></svg>',
+    rotateAuto: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M8 21H3v-5"/><path d="M3 21l7-7"/><path d="M3 12a9 9 0 0 1 14-7.5"/><path d="M21 12a9 9 0 0 1-14 7.5"/></svg>',
     settings: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
     x: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>',
     check: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>'
@@ -113,6 +115,142 @@
   }
 
   // ============================================================
+  // ORIENT LOCK (auto / portrait / landscape) — per cellulare/APK
+  // ============================================================
+  // 3 livelli di lock con fallback graduale:
+  //  1. Capacitor native plugin (APK Android)
+  //  2. Web Screen Orientation API (PWA standalone)
+  //  3. Overlay "ruota il telefono" se i due sopra non hanno effetto e l'orientamento
+  //     fisico del device non corrisponde a quello richiesto
+  const ORIENT_KEY = 'rpg-orient-lock';
+  const VALID_ORIENTS = ['auto', 'portrait', 'landscape'];
+
+  function readStoredOrient() {
+    try {
+      const v = localStorage.getItem(ORIENT_KEY);
+      return VALID_ORIENTS.includes(v) ? v : 'auto';
+    } catch { return 'auto'; }
+  }
+
+  function isCapacitorNative() {
+    try {
+      return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+    } catch { return false; }
+  }
+
+  function getNativeOrientPlugin() {
+    try {
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ScreenOrientation) {
+        return window.Capacitor.Plugins.ScreenOrientation;
+      }
+    } catch { /* no-op */ }
+    return null;
+  }
+
+  function currentDeviceOrientation() {
+    try {
+      // Primary source: window.screen.orientation.type
+      if (window.screen && window.screen.orientation && window.screen.orientation.type) {
+        return window.screen.orientation.type.startsWith('portrait') ? 'portrait' : 'landscape';
+      }
+    } catch { /* no-op */ }
+    // Fallback: aspect ratio
+    return window.innerHeight >= window.innerWidth ? 'portrait' : 'landscape';
+  }
+
+  async function applyOrientLock(mode) {
+    if (!VALID_ORIENTS.includes(mode)) mode = 'auto';
+    document.documentElement.setAttribute('data-orient-lock', mode);
+
+    // Livello 1: native plugin (APK)
+    const native = getNativeOrientPlugin();
+    if (native) {
+      try {
+        if (mode === 'auto') {
+          if (typeof native.unlock === 'function') await native.unlock();
+        } else {
+          await native.lock({ orientation: mode });
+        }
+      } catch (e) { /* ignora, passa al fallback */ }
+    }
+
+    // Livello 2: Web API (PWA standalone)
+    if (!native) {
+      try {
+        if (window.screen && window.screen.orientation) {
+          if (mode === 'auto') {
+            if (typeof window.screen.orientation.unlock === 'function') {
+              window.screen.orientation.unlock();
+            }
+          } else if (typeof window.screen.orientation.lock === 'function') {
+            // Promise; in browser desktop verrà rifiutato silenziosamente
+            const p = window.screen.orientation.lock(mode);
+            if (p && typeof p.catch === 'function') p.catch(() => { /* no-op */ });
+          }
+        }
+      } catch { /* no-op */ }
+    }
+
+    // Livello 3: overlay (sempre valutato)
+    refreshOrientOverlay(mode);
+  }
+
+  function setOrientLock(mode) {
+    if (!VALID_ORIENTS.includes(mode)) return;
+    try { localStorage.setItem(ORIENT_KEY, mode); } catch { /* no-op */ }
+    applyOrientLock(mode);
+  }
+
+  function cycleOrientLock() {
+    const cur = readStoredOrient();
+    const next = cur === 'auto' ? 'portrait' : (cur === 'portrait' ? 'landscape' : 'auto');
+    setOrientLock(next);
+  }
+
+  // ---- Overlay "ruota il telefono" ----
+  function ensureOrientOverlay() {
+    let el = document.getElementById('rpg-orient-overlay');
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = 'rpg-orient-overlay';
+    el.className = 'rpg-orient-overlay';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-live', 'polite');
+    el.style.display = 'none';
+    el.innerHTML = '<div class="rpg-orient-overlay-inner">'
+      + '<div class="rpg-orient-overlay-icon" aria-hidden="true"></div>'
+      + '<div class="rpg-orient-overlay-msg"></div>'
+      + '<button type="button" class="rpg-orient-overlay-dismiss" aria-label="Sblocca orientamento">Sblocca (auto)</button>'
+      + '</div>';
+    el.querySelector('.rpg-orient-overlay-dismiss').addEventListener('click', () => {
+      setOrientLock('auto');
+      const fab = document.getElementById('rpg-orient-toggle');
+      if (fab) refreshOrientButton(fab);
+    });
+    if (document.body) document.body.appendChild(el);
+    return el;
+  }
+
+  function refreshOrientOverlay(mode) {
+    const target = mode || readStoredOrient();
+    const el = document.getElementById('rpg-orient-overlay') || ensureOrientOverlay();
+    if (!el) return;
+    if (target === 'auto') { el.style.display = 'none'; return; }
+    const cur = currentDeviceOrientation();
+    if (cur === target) { el.style.display = 'none'; return; }
+    // Mostra overlay solo se il lock fisico non è andato a buon fine
+    const icon = el.querySelector('.rpg-orient-overlay-icon');
+    const msg = el.querySelector('.rpg-orient-overlay-msg');
+    if (icon) icon.innerHTML = target === 'portrait' ? ICONS.smartphone : ICONS.smartphoneLandscape;
+    if (msg) {
+      msg.textContent = target === 'portrait'
+        ? 'Ruota il telefono in verticale'
+        : 'Ruota il telefono in orizzontale';
+    }
+    el.style.display = 'flex';
+  }
+
+  // ============================================================
   // BOTTONI TOGGLE (auto-mount)
   // ============================================================
   function makeIconButton({ id, icon, label, title, onClick, extraClass = '' }) {
@@ -141,6 +279,25 @@
       ? 'Modalità responsive (passa a landscape-only)'
       : 'Landscape-only (passa a responsive)';
     btn.setAttribute('aria-pressed', cur === 'responsive' ? 'true' : 'false');
+  }
+
+  function refreshOrientButton(btn) {
+    const cur = readStoredOrient();
+    let icon, title;
+    if (cur === 'portrait') { icon = ICONS.smartphone; title = 'Verticale forzato (tap per orizzontale)'; }
+    else if (cur === 'landscape') { icon = ICONS.smartphoneLandscape; title = 'Orizzontale forzato (tap per auto)'; }
+    else { icon = ICONS.rotateAuto; title = 'Auto-rotazione (tap per verticale)'; }
+    btn.innerHTML = icon;
+    btn.title = title;
+    btn.setAttribute('data-orient-state', cur);
+    btn.setAttribute('aria-label', title);
+  }
+
+  function shouldShowOrientToggle() {
+    if (document.body && document.body.classList.contains('tablet-view')) return false;
+    if (isCapacitorNative()) return true;
+    try { return window.matchMedia('(max-width: 768px)').matches; }
+    catch { return window.innerWidth <= 768; }
   }
 
   function mountThemeToggle() {
@@ -175,6 +332,26 @@
     target.appendChild(btn);
   }
 
+  function mountOrientToggle() {
+    if (!shouldShowOrientToggle()) return;
+    if (document.getElementById('rpg-orient-toggle')) return;
+    const target = document.querySelector('[data-orient-toggle-into]') || document.body;
+    const btn = makeIconButton({
+      id: 'rpg-orient-toggle',
+      icon: '',
+      label: 'Orientamento schermo',
+      onClick: () => { cycleOrientLock(); refreshOrientButton(btn); },
+      extraClass: 'rpg-orient-toggle-fab'
+    });
+    refreshOrientButton(btn);
+    target.appendChild(btn);
+  }
+
+  function unmountOrientToggle() {
+    const btn = document.getElementById('rpg-orient-toggle');
+    if (btn && btn.parentNode) btn.parentNode.removeChild(btn);
+  }
+
   // ============================================================
   // INIT (fase early per evitare flash dark/light)
   // ============================================================
@@ -198,8 +375,32 @@
   }
   onReady(() => {
     applyTabletMode(readStoredTabletMode());
+    applyOrientLock(readStoredOrient());
     mountThemeToggle();
     mountTabletModeToggle();
+    mountOrientToggle();
+
+    // Reagisci a cambi di viewport (resize/rotate): mostra/nascondi FAB orient
+    // e aggiorna overlay se l'orientamento fisico è cambiato
+    let resizeTimer = null;
+    const onResize = () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        if (shouldShowOrientToggle()) {
+          mountOrientToggle();
+        } else {
+          unmountOrientToggle();
+        }
+        refreshOrientOverlay();
+      }, 150);
+    };
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    try {
+      if (window.screen && window.screen.orientation && window.screen.orientation.addEventListener) {
+        window.screen.orientation.addEventListener('change', onResize);
+      }
+    } catch { /* no-op */ }
   });
 
   // Espone API minimale
@@ -210,6 +411,11 @@
       get: readStoredTabletMode,
       set: setTabletMode,
       toggle: toggleTabletMode
+    },
+    orientLock: {
+      get: readStoredOrient,
+      set: setOrientLock,
+      cycle: cycleOrientLock
     }
   };
 })();
