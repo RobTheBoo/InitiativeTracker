@@ -29,11 +29,26 @@ if (window.electronAPI && window.electronAPI.isElectron) {
   socketUrl = window.location.origin;
 }
 
+// clientId persistente: utile per il master per identificare la sessione anche dopo refresh
+function getOrCreateClientId() {
+  let id = localStorage.getItem('rpgClientId');
+  if (!id) {
+    if (window.crypto && window.crypto.randomUUID) id = window.crypto.randomUUID();
+    else id = 'm-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 11);
+    localStorage.setItem('rpgClientId', id);
+  }
+  return id;
+}
+const CLIENT_ID = getOrCreateClientId();
+
 console.log('🔗 Connessione socket a:', socketUrl);
 const socket = io(socketUrl, {
+  auth: { clientId: CLIENT_ID, role: 'master' },
+  query: { clientId: CLIENT_ID },
   reconnection: true,
   reconnectionDelay: 1000,
-  reconnectionAttempts: 5,
+  reconnectionDelayMax: 8000,
+  reconnectionAttempts: Infinity,
   transports: ['websocket', 'polling']
 });
 

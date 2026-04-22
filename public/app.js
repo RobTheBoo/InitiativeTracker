@@ -170,6 +170,23 @@ if (window.electronAPI && window.electronAPI.isElectron) {
 } else {
   socketUrl = window.location.origin;
 }
+// clientId persistente: identifica l'utente attraverso refresh, riavvii del browser, riconnessioni.
+// Senza questo, se il giocatore ricarica la pagina perde l'eroe (il server vede un nuovo socket).
+function getOrCreateClientId() {
+  let id = localStorage.getItem('rpgClientId');
+  if (!id) {
+    if (window.crypto && window.crypto.randomUUID) {
+      id = window.crypto.randomUUID();
+    } else {
+      id = 'c-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 11);
+    }
+    localStorage.setItem('rpgClientId', id);
+  }
+  return id;
+}
+const CLIENT_ID = getOrCreateClientId();
+console.log('🆔 clientId:', CLIENT_ID.slice(0, 8) + '…');
+
 // Su Capacitor senza server: non creare il socket (evita modal errore all'avvio). Si creerà dopo "Connetti" con ?server=
 let socket;
 if (isCapacitorApp && !socketUrl) {
@@ -177,9 +194,12 @@ if (isCapacitorApp && !socketUrl) {
 } else {
   const socketConnectUrl = socketUrl || 'http://127.0.0.1:9999';
   socket = io(socketConnectUrl, {
+    auth: { clientId: CLIENT_ID },
+    query: { clientId: CLIENT_ID },
     reconnection: true,
     reconnectionDelay: 1000,
-    reconnectionAttempts: 5,
+    reconnectionDelayMax: 8000,
+    reconnectionAttempts: Infinity,
     transports: ['websocket', 'polling']
   });
 }
@@ -1322,6 +1342,21 @@ socket.on('characterTakenOver', (data) => {
     myHeroId = null;
     alert('Un\'altra sessione ha preso il personaggio "' + (data && data.heroName ? data.heroName : '') + '". Questa finestra verrà chiusa/disconnessa.');
   } catch (_) {}
+});
+
+// Riattacco automatico dopo refresh/riconnessione: il server ci dice "ho riassociato il tuo eroe"
+socket.on('heroReattached', (data) => {
+  if (!data || !data.heroId) return;
+  console.log('🔄 Eroe riattaccato dal server:', data.heroName);
+  myHeroId = data.heroId;
+  saveHero(data.heroId);
+  // Se siamo ancora sulla schermata di selezione, mostra subito quella del personaggio
+  if (gameState) {
+    const hero = gameState.heroes.find(h => h.id === data.heroId);
+    if (hero) {
+      showScreen(gameState.combatStarted ? 'combat' : 'player');
+    }
+  }
 });
 
 socket.on('combatStarted', () => {

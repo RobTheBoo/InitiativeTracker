@@ -133,9 +133,30 @@ class RoomManager {
     socket.join(roomId);
     socket.roomId = roomId;
 
+    // Riattacca automaticamente l'eroe a questo socket se il clientId
+    // corrisponde a un ownerClientId salvato in precedenza.
+    // Questo permette al giocatore di ricaricare la pagina, chiudere il browser
+    // e ricollegarsi senza perdere il personaggio.
+    const clientId = socket.data?.clientId;
+    if (clientId) {
+      let reattached = null;
+      for (const hero of activeRoom.gameState.heroes) {
+        if (hero.ownerClientId && hero.ownerClientId === clientId) {
+          hero.ownerId = socket.id;
+          reattached = hero;
+          break;
+        }
+      }
+      if (reattached) {
+        console.log(`🔄 Riattaccato ${reattached.name} a clientId ${clientId.slice(0, 8)} (socket ${socket.id})`);
+        // Notifica il client che ha ripreso il proprio eroe
+        socket.emit('heroReattached', { heroId: reattached.id, heroName: reattached.name });
+      }
+    }
+
     // Invia stato corrente
     socket.emit('gameState', activeRoom.gameState);
-    console.log(`Client ${socket.id} joined room ${roomId}`);
+    console.log(`Client ${socket.id} (clientId=${clientId ? clientId.slice(0, 8) : 'n/a'}) joined room ${roomId}`);
   }
 
   handleBecomeMaster(socket) {
@@ -289,27 +310,38 @@ class RoomManager {
     
     console.log(`👤 Eroe trovato: ${hero.name}, ownerId attuale: ${hero.ownerId}`);
     
-    // Se è libero o è già del giocatore, assegnaglielo
+    const clientId = socket.data?.clientId || null;
+
+    // Caso 1: eroe libero o già nostro -> claim immediato
     if (!hero.ownerId || hero.ownerId === socket.id) {
       hero.ownerId = socket.id;
+      if (clientId) hero.ownerClientId = clientId;
       this.broadcastAndSave(socket.roomId);
       console.log(`✅ ${socket.id} ha scelto ${hero.name}`);
       return;
     }
-    
-    // Se è occupato, verifica se il socket precedente è ancora connesso
-    const activeRoom = this.activeRooms.get(socket.roomId);
-    if (activeRoom && activeRoom.sockets.has(hero.ownerId)) {
-      // Il socket precedente è ancora connesso, quindi l'eroe è davvero occupato
-      console.log(`⚠️ Eroe ${heroId} già posseduto da ${hero.ownerId} (ancora connesso)`);
-      socket.emit('heroClaimError', { heroId, message: 'Eroe già occupato' });
-    } else {
-      // Il socket precedente non è più connesso, permetti di riprendere l'eroe
-      console.log(`🔄 Socket ${hero.ownerId} non più connesso, permesso di riprendere ${hero.name}`);
+
+    // Caso 2: stesso clientId (stesso utente da nuovo socket dopo refresh) -> takeover silenzioso
+    if (clientId && hero.ownerClientId === clientId) {
       hero.ownerId = socket.id;
       this.broadcastAndSave(socket.roomId);
-      console.log(`✅ ${socket.id} ha ripreso ${hero.name} (socket precedente disconnesso)`);
+      console.log(`🔄 ${socket.id} ha ripreso ${hero.name} via clientId match`);
+      return;
     }
+
+    // Caso 3: il socket precedente non è più connesso -> permetti il claim
+    const activeRoom = this.activeRooms.get(socket.roomId);
+    if (activeRoom && !activeRoom.sockets.has(hero.ownerId)) {
+      console.log(`🔄 Socket ${hero.ownerId} non più connesso, ${socket.id} prende ${hero.name}`);
+      hero.ownerId = socket.id;
+      if (clientId) hero.ownerClientId = clientId;
+      this.broadcastAndSave(socket.roomId);
+      return;
+    }
+
+    // Caso 4: occupato da utente diverso ancora attivo
+    console.log(`⚠️ Eroe ${heroId} già posseduto da ${hero.ownerId} (ancora connesso)`);
+    socket.emit('heroClaimError', { heroId, message: 'Eroe già occupato' });
   }
 
   handleReleaseHero(socket, heroId) {
@@ -320,8 +352,9 @@ class RoomManager {
     // Permetti al master di liberare qualsiasi eroe, oppure al proprietario di liberare il proprio
     if (hero && (hero.ownerId === socket.id || socket.id === gs.masterId)) {
       hero.ownerId = null;
+      hero.ownerClientId = null;
       hero.initiative = null;
-      hero.effects = []; // Pulisci anche gli effetti quando il master libera l'eroe
+      hero.effects = [];
       this.broadcastAndSave(socket.roomId);
       console.log(`🔓 Eroe ${hero.name} liberato da ${socket.id === gs.masterId ? 'master' : 'proprietario'}`);
     }

@@ -8,10 +8,24 @@ if (window.electronAPI && window.electronAPI.isElectron) {
   // In browser, usa l'URL corrente
   socketUrl = window.location.origin;
 }
+function getOrCreateClientId() {
+  let id = localStorage.getItem('rpgClientId');
+  if (!id) {
+    if (window.crypto && window.crypto.randomUUID) id = window.crypto.randomUUID();
+    else id = 't-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 11);
+    localStorage.setItem('rpgClientId', id);
+  }
+  return id;
+}
+const CLIENT_ID = getOrCreateClientId();
+
 const socket = io(socketUrl, {
+  auth: { clientId: CLIENT_ID, role: 'tablet' },
+  query: { clientId: CLIENT_ID },
   reconnection: true,
   reconnectionDelay: 1000,
-  reconnectionAttempts: 5,
+  reconnectionDelayMax: 8000,
+  reconnectionAttempts: Infinity,
   transports: ['websocket', 'polling']
 });
 
