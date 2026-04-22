@@ -322,7 +322,7 @@ function renderInitiativeFields(char, setterFnName) {
            placeholder="Init" min="0" onchange="${setterFnName}('${char.id}', this.value)">
     <input type="number" class="tie-input ${hasTie ? 'active' : 'inactive'}"
            value="${tieVal}" placeholder="·" min="1" max="9" step="1"
-           title="${hasTie ? 'Ordine in pari iniziativa (1-9). Modifica per cambiare l\\'ordine.' : 'Disponibile solo se due personaggi hanno la stessa iniziativa.'}"
+           title="${hasTie ? 'Ordine in pari iniziativa (1-9) - modificabile dal master' : 'Si attiva solo se due personaggi hanno la stessa iniziativa'}"
            ${tieDisabled}
            onchange="setCharTiebreaker('${char.id}', this.value)">
   `;
