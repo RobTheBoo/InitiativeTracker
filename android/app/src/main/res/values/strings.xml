@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">RPG Initiative Tracker</string>
+    <string name="title_activity_main">RPG Initiative Tracker</string>
+    <string name="package_name">com.rpg.initiativetracker</string>
+    <string name="custom_url_scheme">com.rpg.initiativetracker</string>
+</resources>

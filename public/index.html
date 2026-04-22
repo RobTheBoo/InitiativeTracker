@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+  <meta name="theme-color" content="#111111">
+  <title>🎲 Initiative Tracker - Giocatore</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital@0;1&display=swap" rel="stylesheet">
+  <script>
+    // Definisci connectToServerHandler immediatamente come stub
+    // Questa sarà sovrascritta da app.js quando viene caricato
+    window.connectToServerHandler = function(e) {
+      // Se la funzione reale non è ancora disponibile, aspetta e riprova
+      const checkInterval = setInterval(function() {
+        // Controlla se app.js ha ridefinito la funzione (la versione reale è async)
+        const handler = window.connectToServerHandler;
+        if (handler && handler.toString().includes('async function')) {
+          clearInterval(checkInterval);
+          handler(e);
+        }
+      }, 50);
+      
+      // Timeout dopo 5 secondi
+      setTimeout(function() {
+        clearInterval(checkInterval);
+        if (!window.connectToServerHandler || !window.connectToServerHandler.toString().includes('async function')) {
+          alert('⏳ Caricamento in corso... Attendi qualche secondo e riprova.');
+        }
+      }, 5000);
+    };
+  </script>
+</head>
+<body class="player-view">
+  <div class="container">
+    <header>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <h1>⚔️ Initiative Tracker</h1>
+          <p class="subtitle">Vista Giocatore</p>
+        </div>
+        <button id="back-to-rooms-btn" class="btn secondary small">← Stanze</button>
+      </div>
+    </header>
+
+    <!-- Schermata selezione stanza -->
+    <section id="room-selection" class="screen active">
+      <h2>Seleziona una Stanza</h2>
+      
+      <!-- Campo IP Server - SEMPRE VISIBILE su mobile -->
+      <div id="server-ip-section" style="background: var(--card-bg); padding: 20px; border-radius: 12px; margin-bottom: 30px; max-width: 500px; margin-left: auto; margin-right: auto;">
+        <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px;">
+          📡 <strong>IP del Master</strong>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;" 
+             onclick="var i=document.getElementById('server-ip-input');if(i&&event.target!==document.getElementById('connect-ip-btn'))i.focus();">
+          <input type="text" 
+                 id="server-ip-input" 
+                 class="room-name-input" 
+                 placeholder="192.168.1.27:3001 oppure 10.0.2.2:3001 (emulatore)"
+                 style="flex: 1; font-size: 1rem; padding: 14px; min-height: 44px; -webkit-user-select: text; user-select: text;"
+                 tabindex="0"
+                 autocomplete="off">
+          <button type="button" id="connect-ip-btn" class="btn primary" style="white-space: nowrap; min-height: 44px; min-width: 120px; cursor: pointer; touch-action: manipulation;"
+                  onclick="if(window.connectToServerHandler){event.preventDefault();event.stopPropagation();window.connectToServerHandler(event);}">
+            🔌 Connetti
+          </button>
+        </div>
+        <div id="server-ip-status" style="margin-top: 10px; font-size: 0.85rem; min-height: 20px;"></div>
+        <!-- Area Debug - SEMPRE VISIBILE -->
+        <div id="debug-area" style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; font-size: 0.8rem; border: 1px solid rgba(255,255,255,0.1);">
+          <div style="font-weight: bold; margin-bottom: 5px; color: var(--text-muted);">🔍 Debug Info:</div>
+          <div id="debug-content" style="font-family: monospace; white-space: pre-wrap; word-break: break-all; color: var(--text);">In attesa di connessione...</div>
+        </div>
+      </div>
+      
+      <div id="rooms-grid" class="character-grid" style="max-width: 800px; margin: 0 auto;">
+        <!-- Generato da JavaScript -->
+      </div>
+      <div id="rooms-loading" style="text-align: center; padding: 40px; color: var(--text-muted);">
+        Caricamento stanze...
+      </div>
+      <div id="rooms-empty" class="empty-state" style="display:none; text-align: center; padding: 40px;">
+        <div style="font-size: 3rem; margin-bottom: 20px;">📋</div>
+        <h3>Nessuna stanza disponibile</h3>
+        <p>Chiedi al Master di creare una stanza</p>
+      </div>
+    </section>
+
+    <!-- Schermata selezione personaggio -->
+    <section id="character-selection" class="screen">
+      <h2>Scegli il tuo Personaggio</h2>
+      <p id="selection-hint" class="selection-hint" style="display:none; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 12px;">
+        Sei entrato nel personaggio sbagliato? Tocca «Cambia personaggio» nella schermata del tuo PG (sotto o in combattimento).
+      </p>
+      <div id="character-grid" class="character-grid">
+        <!-- Generato da JavaScript -->
+      </div>
+      <button id="clear-saved-hero-btn" type="button" class="btn secondary small" style="margin-top: 12px;">Cancella personaggio salvato e ricarica</button>
+      <!-- Link rimossi per app mobile: i giocatori non devono accedere a Master/Tablet/Config -->
+      <!-- Su mobile, questi link non sono necessari -->
+    </section>
+
+    <!-- Schermata personaggio -->
+    <section id="player-screen" class="screen">
+      <div class="player-layout">
+        <!-- Sidebar con ritratto e iniziativa -->
+        <div class="player-sidebar">
+          <div class="my-character-card">
+            <div class="character-portrait" id="my-portrait">
+              <span class="placeholder-icon">🧙</span>
+            </div>
+            <input type="text" id="my-character-name" class="editable-name" value="Il tuo Personaggio">
+            
+            <div class="initiative-input-group">
+              <label for="initiative-input">Iniziativa:</label>
+              <input type="number" id="initiative-input" min="1" max="50" placeholder="?">
+              <button id="set-initiative-btn" class="btn primary">✓</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Colonna principale con effetti ed evocazioni -->
+        <div class="player-main">
+          <!-- Effetti personali -->
+          <div class="effects-section">
+            <h3>🔮 I Tuoi Effetti</h3>
+            <div id="my-effects-list" class="effects-list">
+              <!-- Generato da JavaScript -->
+            </div>
+            <div class="add-effect-form">
+              <input type="text" id="effect-name" placeholder="Nome effetto" class="effect-input wide" list="effects-datalist">
+              <div class="segno-toggle" data-select-id="effect-bonus">
+                <select id="effect-bonus" class="visually-hidden" aria-hidden="true">
+                  <option value="bonus">+</option>
+                  <option value="malus">-</option>
+                </select>
+                <button type="button" class="segno-btn" data-value="bonus" title="Bonus">+</button>
+                <button type="button" class="segno-btn" data-value="malus" title="Malus">−</button>
+              </div>
+              <input type="number" id="effect-duration" placeholder="Rnd" min="1" class="effect-input small">
+              <button id="add-effect-btn" class="btn primary small">+</button>
+            </div>
+          </div>
+
+          <!-- Effetti ad Area -->
+          <div class="area-effects-section">
+            <h3>🌍 Effetti ad Area</h3>
+            <div id="area-effects-list" class="effects-list area">
+              <!-- Generato da JavaScript -->
+            </div>
+            <div class="add-area-effect-form">
+              <input type="text" id="area-effect-name" placeholder="Nome effetto ad area" class="effect-input" list="effects-datalist">
+              <input type="number" id="area-effect-duration" placeholder="Rnd" min="1" class="effect-input small">
+              <button id="add-area-effect-btn" class="btn primary small">+</button>
+            </div>
+          </div>
+
+          <!-- Evocazioni -->
+          <div class="summons-section">
+            <h3>🔮 Evocazioni</h3>
+            <div id="summons-list" class="effects-list">
+              <!-- Generato da JavaScript -->
+            </div>
+            <div class="add-summon-form">
+              <div class="custom-select-wrap" data-select-id="summon-type">
+                <select id="summon-type" class="visually-hidden" aria-hidden="true">
+                  <option value="">Seleziona evocazione...</option>
+                </select>
+                <button type="button" class="custom-select-trigger" id="summon-type-trigger">Seleziona evocazione...</button>
+                <div class="custom-select-panel" id="summon-type-panel"></div>
+              </div>
+              <input type="number" id="summon-initiative" placeholder="Init" min="1" class="effect-input small">
+              <input type="number" id="summon-duration" placeholder="Rnd" min="1" class="effect-input small">
+              <button id="add-summon-btn" class="btn primary small">+ Evoca</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="player-screen-footer">
+        <button id="release-character-btn" class="btn secondary">↩ Cambia Personaggio</button>
+      </div>
+    </section>
+
+    <!-- Schermata combattimento -->
+    <section id="combat-screen" class="screen">
+      <div class="round-indicator">
+        <span class="round-label">Round</span>
+        <span id="round-number" class="round-number">1</span>
+      </div>
+      
+      <div class="turn-indicator">
+        <span id="current-turn-text">Turno di...</span>
+      </div>
+      
+      <div class="delay-action" id="delay-action" style="display:none;">
+        <button id="delay-btn" class="btn warning">⏸ Ritarda il tuo turno</button>
+      </div>
+      
+      <!-- Personaggi ritardati (solo per il giocatore) -->
+      <div class="delayed-panel-player" id="delayed-panel-player" style="display:none;">
+        <h4>⏸ Il tuo personaggio è ritardato</h4>
+        <div id="delayed-list-player" class="delayed-list">
+          <!-- Generato da JavaScript -->
+        </div>
+      </div>
+      
+      <div class="initiative-bar-container">
+        <div class="initiative-bar" id="initiative-bar">
+          <!-- Generato da JavaScript -->
+        </div>
+      </div>
+
+      <!-- Effetti in combattimento -->
+      <div class="combat-effects" style="display: flex; gap: 20px; align-items: flex-start;">
+        <!-- Solo evocazioni in formato compatto (nascosto se non ci sono evocazioni) -->
+        <div class="entity-selector" id="entity-selector-wrap" style="flex-shrink: 0;">
+          <div id="entity-cards" class="entity-cards-compact">
+            <!-- Generato da JavaScript: solo evocazioni + chip "Tu" se necessario -->
+          </div>
+        </div>
+        
+        <!-- Blocco effetti per l'entità selezionata -->
+        <div class="my-combat-effects" style="flex: 1;">
+          <h4 id="selected-entity-title">🔮 I Tuoi Effetti</h4>
+          <div id="combat-my-effects" class="effects-list compact">
+            <!-- Generato da JavaScript -->
+          </div>
+          <div class="add-effect-form compact">
+            <input type="text" id="combat-effect-name" placeholder="Effetto" class="effect-input wide" list="effects-datalist">
+            <div class="segno-toggle" data-select-id="combat-effect-bonus">
+              <select id="combat-effect-bonus" class="visually-hidden" aria-hidden="true">
+                <option value="bonus">+</option>
+                <option value="malus">-</option>
+              </select>
+              <button type="button" class="segno-btn" data-value="bonus" title="Bonus">+</button>
+              <button type="button" class="segno-btn" data-value="malus" title="Malus">−</button>
+            </div>
+            <input type="number" id="combat-effect-duration" placeholder="Rnd" min="1" class="effect-input small">
+            <button id="combat-add-effect-btn" class="btn primary small">+</button>
+          </div>
+        </div>
+        
+        <div class="area-combat-effects" style="min-width: 250px; flex-shrink: 0;">
+          <h4>🌍 Effetti ad Area</h4>
+          <div id="combat-area-effects" class="effects-list compact area">
+            <!-- Generato da JavaScript -->
+          </div>
+          <div class="add-area-effect-form compact">
+            <input type="text" id="combat-area-effect-name" placeholder="Effetto area" class="effect-input" list="effects-datalist">
+            <input type="number" id="combat-area-effect-duration" placeholder="Rnd" min="1" class="effect-input small">
+            <button id="combat-add-area-effect-btn" class="btn primary small">+</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Evocazioni in combattimento (visibile solo durante il proprio turno) -->
+      <div class="combat-summons-section" id="combat-summons-section" style="display:none;">
+        <h4>🔮 Evocazioni</h4>
+        <div id="combat-summons" class="effects-list compact">
+          <!-- Generato da JavaScript -->
+        </div>
+        <div class="add-summon-form compact">
+          <div class="custom-select-wrap" data-select-id="combat-summon-type">
+          <select id="combat-summon-type" class="visually-hidden" aria-hidden="true">
+            <option value="">Seleziona evocazione...</option>
+          </select>
+          <button type="button" class="custom-select-trigger" id="combat-summon-type-trigger">Seleziona evocazione...</button>
+          <div class="custom-select-panel" id="combat-summon-type-panel"></div>
+        </div>
+          <input type="number" id="combat-summon-initiative" placeholder="Init" min="1" class="effect-input small">
+          <input type="number" id="combat-summon-duration" placeholder="Rnd" min="1" class="effect-input small">
+          <button id="combat-add-summon-btn" class="btn primary small">+ Evoca</button>
+        </div>
+      </div>
+
+      <div class="combat-screen-footer">
+        <button id="release-character-combat-btn" class="btn secondary">↩ Cambia Personaggio</button>
+      </div>
+    </section>
+  </div>
+
+  <datalist id="effects-datalist">
+    <!-- Popolato dinamicamente da JavaScript -->
+  </datalist>
+
+  <!-- Modal errore connessione (in APK/emulatore alert() non si chiude bene) -->
+  <div id="connection-error-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3>❌ Errore di connessione al server</h3>
+      <p id="connection-error-text">Configura l'IP del Master nel campo sotto e clicca Connetti.</p>
+      <div class="modal-actions" style="margin-top: 1rem;">
+        <button type="button" id="connection-error-ok" class="btn primary" style="min-height: 48px; min-width: 120px; touch-action: manipulation; cursor: pointer;" onclick="window.hideConnectionErrorModal &amp;&amp; window.hideConnectionErrorModal();">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal conferma Cambia personaggio (funziona anche in APK/WebView) -->
+  <div id="release-character-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3>Cambiare personaggio?</h3>
+      <p>Perderai il collegamento al personaggio attuale. Sei sicuro?</p>
+      <div class="modal-actions">
+        <button type="button" id="release-character-cancel" class="btn secondary">Annulla</button>
+        <button type="button" id="release-character-confirm" class="btn primary">Sì, cambia</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal per scegliere posizione quando rientri con tie -->
+  <div id="undelay-position-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3>Scegli la posizione</h3>
+      <p>Ci sono altri personaggi con la stessa iniziativa. Scegli dove vuoi posizionarti:</p>
+      <div id="undelay-position-options" class="undelay-options">
+        <!-- Generato da JavaScript -->
+      </div>
+      <button id="undelay-position-cancel" class="btn secondary" style="margin-top: 15px;">Annulla</button>
+    </div>
+  </div>
+
+  <!-- Socket.IO: locale per funzionare in APK/WebView senza dipendere dal CDN -->
+  <script src="socket.io.min.js"></script>
+  <script src="app.js"></script>
+  <script>
+    // Registrazione Service Worker per PWA solo in browser (non in app Capacitor/Electron)
+    var isNative = (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) || (window.electronAPI && window.electronAPI.isElectron);
+    if (!isNative && 'serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').catch(function (err) {
+          console.warn('Service worker registration failed:', err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>

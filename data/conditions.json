@@ -1,0 +1,241 @@
+{
+  "conditions": [
+    {
+      "id": "blinded",
+      "name": "Accecato",
+      "nameEn": "Blinded",
+      "description": "Non puoi vedere. Subisci penalità -2 alla CA, perdi il bonus di Destrezza alla CA, e subisci penalità -4 alla maggior parte delle prove basate su Forza e Destrezza e alle prove di abilità che si basano sulla vista. Gli avversari hanno occultamento totale contro di te (50% probabilità di mancarlo).",
+      "penalties": [
+        { "type": "CA", "value": -2 },
+        { "type": "Prove Forza/Destrezza", "value": -4 }
+      ]
+    },
+    {
+      "id": "confused",
+      "name": "Confuso",
+      "nameEn": "Confused",
+      "description": "Una creatura confusa non può distinguere alleati da nemici. Ogni round tira 1d100: 01-25 agisce normalmente, 26-50 non fa nulla, 51-75 si infligge 1d8+For danni, 76-100 attacca la creatura più vicina.",
+      "penalties": []
+    },
+    {
+      "id": "cowering",
+      "name": "Rannicchiato",
+      "nameEn": "Cowering",
+      "description": "Il personaggio è paralizzato dalla paura. Perde il bonus di Destrezza alla CA e non può agire.",
+      "penalties": [
+        { "type": "CA (perde Des)", "value": 0 }
+      ]
+    },
+    {
+      "id": "dazed",
+      "name": "Frastornato",
+      "nameEn": "Dazed",
+      "description": "Non puoi agire normalmente. Puoi fare solo azioni gratuite, ma non puoi intraprendere altre azioni.",
+      "penalties": []
+    },
+    {
+      "id": "dazzled",
+      "name": "Abbagliato",
+      "nameEn": "Dazzled",
+      "description": "Incapace di vedere bene a causa di sovrastimolazione degli occhi. Subisci penalità -1 ai tiri per colpire e alle prove di Percezione basate sulla vista.",
+      "penalties": [
+        { "type": "Tiri per colpire", "value": -1 },
+        { "type": "Percezione", "value": -1 }
+      ]
+    },
+    {
+      "id": "deafened",
+      "name": "Assordato",
+      "nameEn": "Deafened",
+      "description": "Non puoi sentire. Subisci penalità -4 all'iniziativa e fallisci automaticamente le prove di Percezione basate sull'udito. 20% probabilità di fallimento incantesimi con componenti verbali.",
+      "penalties": [
+        { "type": "Iniziativa", "value": -4 }
+      ]
+    },
+    {
+      "id": "entangled",
+      "name": "Intralciato",
+      "nameEn": "Entangled",
+      "description": "Ti muovi a metà velocità, non puoi correre o caricare, e subisci penalità -2 ai tiri per colpire e -4 alla Destrezza. Lanciare incantesimi richiede prova di Concentrazione (CD 15 + livello incantesimo).",
+      "penalties": [
+        { "type": "Tiri per colpire", "value": -2 },
+        { "type": "Destrezza", "value": -4 }
+      ]
+    },
+    {
+      "id": "exhausted",
+      "name": "Esausto",
+      "nameEn": "Exhausted",
+      "description": "Ti muovi a metà velocità, non puoi correre o caricare. Subisci penalità -6 a Forza e Destrezza. Dopo 1 ora di riposo diventi solo Affaticato.",
+      "penalties": [
+        { "type": "Forza", "value": -6 },
+        { "type": "Destrezza", "value": -6 }
+      ]
+    },
+    {
+      "id": "fascinated",
+      "name": "Affascinato",
+      "nameEn": "Fascinated",
+      "description": "Sei ammaliato da qualcosa. Subisci penalità -4 alle prove di abilità fatte come reazione (come Percezione). Qualsiasi minaccia evidente rompe l'effetto.",
+      "penalties": [
+        { "type": "Prove reattive", "value": -4 }
+      ]
+    },
+    {
+      "id": "fatigued",
+      "name": "Affaticato",
+      "nameEn": "Fatigued",
+      "description": "Non puoi correre o caricare. Subisci penalità -2 a Forza e Destrezza. Fare qualcosa che normalmente ti affaticherebbe ti rende Esausto.",
+      "penalties": [
+        { "type": "Forza", "value": -2 },
+        { "type": "Destrezza", "value": -2 }
+      ]
+    },
+    {
+      "id": "flat-footed",
+      "name": "Colto alla Sprovvista",
+      "nameEn": "Flat-Footed",
+      "description": "Non puoi reagire normalmente. Perdi il bonus di Destrezza alla CA (se ne hai uno) e non puoi fare attacchi di opportunità.",
+      "penalties": [
+        { "type": "CA (perde Des)", "value": 0 }
+      ]
+    },
+    {
+      "id": "frightened",
+      "name": "Spaventato",
+      "nameEn": "Frightened",
+      "description": "Subisci penalità -2 ai tiri per colpire, tiri salvezza, prove di abilità e prove di caratteristica. Devi fuggire dalla fonte della paura se possibile.",
+      "penalties": [
+        { "type": "Tiri per colpire", "value": -2 },
+        { "type": "Tiri salvezza", "value": -2 },
+        { "type": "Prove di abilità", "value": -2 }
+      ]
+    },
+    {
+      "id": "grappled",
+      "name": "In Lotta",
+      "nameEn": "Grappled",
+      "description": "Sei trattenuto da un avversario. Non puoi muoverti e subisci penalità -4 alla Destrezza e -2 ai tiri per colpire (eccetto per liberarti o mantenere la lotta).",
+      "penalties": [
+        { "type": "Destrezza", "value": -4 },
+        { "type": "Tiri per colpire", "value": -2 }
+      ]
+    },
+    {
+      "id": "helpless",
+      "name": "Indifeso",
+      "nameEn": "Helpless",
+      "description": "Sei paralizzato, immobilizzato, incosciente o comunque incapace di agire. La tua Destrezza è considerata 0 (-5 mod). Gli attacchi in mischia contro di te hanno +4, i ladri possono usare colpo di grazia.",
+      "penalties": [
+        { "type": "Destrezza effettiva", "value": 0 }
+      ]
+    },
+    {
+      "id": "invisible",
+      "name": "Invisibile",
+      "nameEn": "Invisible",
+      "description": "Non puoi essere visto. Hai +2 ai tiri per colpire, ignori il bonus di Destrezza alla CA del nemico. I nemici hanno 50% probabilità di mancarti (occultamento totale).",
+      "penalties": []
+    },
+    {
+      "id": "nauseated",
+      "name": "Nauseato",
+      "nameEn": "Nauseated",
+      "description": "Senti forte nausea. Puoi fare solo una singola azione di movimento per round e non puoi attaccare, lanciare incantesimi o concentrarti.",
+      "penalties": []
+    },
+    {
+      "id": "panicked",
+      "name": "In Panico",
+      "nameEn": "Panicked",
+      "description": "Lasci cadere tutto e fuggi dalla fonte della paura. Subisci penalità -2 ai tiri salvezza, prove di abilità e caratteristica. Se sei bloccato, sei rannicchiato.",
+      "penalties": [
+        { "type": "Tiri salvezza", "value": -2 },
+        { "type": "Prove di abilità", "value": -2 }
+      ]
+    },
+    {
+      "id": "paralyzed",
+      "name": "Paralizzato",
+      "nameEn": "Paralyzed",
+      "description": "Sei immobilizzato e indifeso. Non puoi muoverti o agire. Hai Forza e Destrezza effettiva di 0 ma puoi fare azioni puramente mentali.",
+      "penalties": [
+        { "type": "Forza effettiva", "value": 0 },
+        { "type": "Destrezza effettiva", "value": 0 }
+      ]
+    },
+    {
+      "id": "petrified",
+      "name": "Pietrificato",
+      "nameEn": "Petrified",
+      "description": "Sei stato trasformato in pietra. Sei considerato incosciente. Se sei danneggiato o rotto mentre pietrificato, il tuo corpo subisce danni simili quando torni normale.",
+      "penalties": []
+    },
+    {
+      "id": "pinned",
+      "name": "Immobilizzato",
+      "nameEn": "Pinned",
+      "description": "Sei trattenuto strettamente in lotta. Sei considerato colto alla sprovvista e subisci penalità -4 alla CA contro avversari diversi da chi ti immobilizza.",
+      "penalties": [
+        { "type": "CA", "value": -4 }
+      ]
+    },
+    {
+      "id": "prone",
+      "name": "Prono",
+      "nameEn": "Prone",
+      "description": "Sei a terra. Subisci penalità -4 ai tiri per colpire in mischia e non puoi usare armi a distanza (eccetto balestre). Hai +4 CA contro attacchi a distanza ma -4 contro mischia.",
+      "penalties": [
+        { "type": "Tiri per colpire mischia", "value": -4 },
+        { "type": "CA vs mischia", "value": -4 }
+      ]
+    },
+    {
+      "id": "shaken",
+      "name": "Scosso",
+      "nameEn": "Shaken",
+      "description": "Subisci penalità -2 ai tiri per colpire, tiri salvezza, prove di abilità e prove di caratteristica. È una condizione di paura.",
+      "penalties": [
+        { "type": "Tiri per colpire", "value": -2 },
+        { "type": "Tiri salvezza", "value": -2 },
+        { "type": "Prove di abilità", "value": -2 }
+      ]
+    },
+    {
+      "id": "sickened",
+      "name": "Infermo",
+      "nameEn": "Sickened",
+      "description": "Subisci penalità -2 a tutti i tiri per colpire, danni delle armi, tiri salvezza, prove di abilità e prove di caratteristica.",
+      "penalties": [
+        { "type": "Tiri per colpire", "value": -2 },
+        { "type": "Danni", "value": -2 },
+        { "type": "Tiri salvezza", "value": -2 },
+        { "type": "Prove di abilità", "value": -2 }
+      ]
+    },
+    {
+      "id": "staggered",
+      "name": "Barcollante",
+      "nameEn": "Staggered",
+      "description": "Puoi fare solo una singola azione standard o di movimento ogni round (più azioni gratuite e rapide). Non puoi fare azioni di round completo.",
+      "penalties": []
+    },
+    {
+      "id": "stunned",
+      "name": "Stordito",
+      "nameEn": "Stunned",
+      "description": "Lasci cadere tutto, non puoi agire, subisci penalità -2 alla CA e perdi il bonus di Destrezza alla CA.",
+      "penalties": [
+        { "type": "CA", "value": -2 }
+      ]
+    },
+    {
+      "id": "unconscious",
+      "name": "Incosciente",
+      "nameEn": "Unconscious",
+      "description": "Sei privo di sensi e indifeso. Di solito questo è causato da danni non letali o per essere stato ridotto a PF negativi.",
+      "penalties": []
+    }
+  ]
+}
+

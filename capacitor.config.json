@@ -1,0 +1,12 @@
+{
+  "appId": "com.rpg.initiativetracker",
+  "appName": "RPG Initiative Tracker",
+  "webDir": "public",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

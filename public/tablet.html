@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+  <title>📺 Initiative Tracker - Tablet</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital@0;1&display=swap" rel="stylesheet">
+</head>
+<body class="tablet-view">
+  <div class="tablet-container">
+    
+    <!-- Turno corrente -->
+    <section class="tablet-initiative">
+      <div class="current-turn-mega" id="current-turn-container">
+        <div class="turn-portrait" id="turn-portrait">?</div>
+        <div class="turn-name" id="turn-name">In attesa del combattimento...</div>
+      </div>
+      
+      <!-- Barra iniziativa -->
+      <div class="initiative-bar-tablet" id="initiative-bar">
+        <!-- Generato da JavaScript -->
+      </div>
+    </section>
+
+    <!-- Effetti ad Area -->
+    <section class="tablet-effects">
+      <div class="tablet-effects-header">
+        <h2>🌍 Effetti Attivi</h2>
+        <div class="round-display tablet">
+          <span class="round-label">ROUND</span>
+          <span id="round-number" class="round-number mega">1</span>
+        </div>
+      </div>
+      <div id="area-effects-display" class="tablet-effects-grid">
+        <!-- Generato da JavaScript -->
+      </div>
+    </section>
+
+    <!-- Stato attesa combattimento -->
+    <section id="waiting-screen" class="tablet-waiting">
+      <div class="waiting-content">
+        <div class="waiting-icon">⏳</div>
+        <h2>In attesa del combattimento</h2>
+        <p>Il Master deve avviare il combattimento</p>
+        
+        <!-- QR Code per connessione giocatori -->
+        <div class="qr-code-section" style="margin: 30px 0; text-align: center;">
+          <div style="color: var(--text-muted); margin-bottom: 10px; font-size: 0.9rem;">I giocatori si connettono a:</div>
+          <div id="server-ip" style="font-size: 1.2rem; font-weight: bold; color: var(--accent-gold); font-family: 'Courier New', monospace; margin-bottom: 15px;">Caricamento...</div>
+          <div id="qr-code-container" style="display: none; margin: 20px auto; max-width: 250px;">
+            <div id="qr-code" style="background: white; padding: 15px; border-radius: 10px; display: inline-block;"></div>
+          </div>
+        </div>
+        
+        <div class="connected-players">
+          <h3>Giocatori Connessi</h3>
+          <div id="players-list" class="players-grid">
+            <!-- Generato da JavaScript -->
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <script src="tablet.js"></script>
+</body>
+</html>
+

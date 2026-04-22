@@ -1,0 +1,98 @@
+{
+  "name": "rpg-initiative-tracker",
+  "version": "1.0.0",
+  "description": "RPG Initiative Tracker - Pathfinder 1E Combat Manager",
+  "main": "electron/main.js",
+  "build": {
+    "appId": "com.rpg.initiative-tracker",
+    "productName": "RPG Initiative Tracker",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "public/**/*",
+      "!public/images/**/*",
+      "data/**/*",
+      "server.js",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "public/icon.icns"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "public/icon.png"
+    }
+  },
+  "keywords": [
+    "rpg",
+    "pathfinder",
+    "initiative",
+    "combat",
+    "tracker"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "express": "^5.2.1",
+    "multer": "^2.0.2",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "electron-rebuild": "^3.2.9",
+    "pkg": "^5.8.1",
+    "sharp": "^0.34.5",
+    "to-ico": "^1.1.5"
+  },
+  "scripts": {
+    "open-firewall": "powershell -ExecutionPolicy Bypass -File scripts/open-firewall-port.ps1",
+    "start": "node server.js",
+    "dev": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --windows && npm run restore-data && npm run clean:win-unpacked",
+    "restore-data": "node scripts/restore-data.js",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "generate-icons": "node scripts/generate-icons.js",
+    "clean:win-unpacked": "node -e \"const fs = require('fs'); const path = require('path'); const rootUnpacked = path.join(__dirname, 'win-unpacked'); if (fs.existsSync(rootUnpacked)) { fs.rmSync(rootUnpacked, { recursive: true, force: true }); console.log('Rimossa win-unpacked dalla root'); }\"",
+    "create-shortcut": "node scripts/create-shortcut.js",
+    "create-shortcut-ps": "powershell -ExecutionPolicy Bypass -File scripts/create-shortcut.ps1",
+    "build-shortcut": "node scripts/build-shortcut.js",
+    "cap:init": "cap add android",
+    "cap:sync": "cap sync android",
+    "cap:open:android": "cap open android"
+  },
+  "pkg": {
+    "scripts": [
+      "scripts/create-shortcut.js"
+    ],
+    "assets": []
+  }
+}

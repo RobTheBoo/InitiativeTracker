@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+  <title>🎭 Initiative Tracker - Master</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital@0;1&display=swap" rel="stylesheet">
+</head>
+<body class="master-view">
+  <div class="container wide">
+    <header>
+      <div>
+        <h1>🎭 Master Control</h1>
+        <p class="subtitle" id="master-status">Connessione in corso...</p>
+      </div>
+    </header>
+
+    <!-- Pannello principale master -->
+    <section id="master-panel" class="screen active">
+      <!-- Barra iniziativa sopra tutto -->
+      <div class="initiative-bar-container-top" id="combat-bar" style="display:none;">
+        <div class="initiative-bar" id="initiative-bar">
+          <!-- Generato da JavaScript -->
+        </div>
+      </div>
+
+      <div class="master-layout">
+        
+        <!-- Colonna sinistra: Eroi -->
+        <div class="column heroes-column">
+          <h2>⚔️ Eroi</h2>
+          <div id="heroes-list" class="characters-list">
+            <!-- Generato da JavaScript -->
+          </div>
+        </div>
+
+        <!-- Colonna centrale: Controlli -->
+        <div class="column controls-column">
+          <div class="round-display">
+            <span class="round-label">Round</span>
+            <span id="round-number" class="round-number large">1</span>
+          </div>
+          
+          <div class="combat-controls">
+            <button id="start-combat-btn" class="btn large success">⚔️ Inizia Combattimento</button>
+            <button id="stop-combat-btn" class="btn large danger" style="display:none;">🛑 Ferma Combattimento</button>
+          </div>
+
+          <div class="turn-controls" style="display:none;" id="turn-controls">
+            <button id="prev-turn-btn" class="nav-btn">◀ Indietro</button>
+            <div class="current-turn-display">
+              <span id="current-turn-text">In attesa...</span>
+            </div>
+            <button id="next-turn-btn" class="nav-btn">Avanti ▶</button>
+          </div>
+
+          <!-- Effetti ad Area -->
+          <div class="area-effects-panel">
+            <h3>🌍 Effetti ad Area</h3>
+            <div id="area-effects-list" class="effects-list area">
+              <!-- Generato da JavaScript -->
+            </div>
+            <div class="add-area-effect-form">
+              <input type="text" id="area-effect-name" placeholder="Nome effetto" class="effect-input" list="effects-datalist">
+              <input type="number" id="area-effect-duration" placeholder="Rnd" min="1" class="effect-input small">
+              <button id="add-area-effect-btn" class="btn primary small">+ Area</button>
+            </div>
+          </div>
+          
+          <!-- Personaggi Ritardati -->
+          <div class="delayed-panel" id="delayed-panel" style="display:none;">
+            <h3>⏸ Ritardati</h3>
+            <div id="delayed-list" class="delayed-list">
+              <!-- Generato da JavaScript -->
+            </div>
+          </div>
+
+          <button id="reset-all-btn" class="btn small danger">🔄 Reset Tutto</button>
+          
+          <!-- Pulsante per tornare alle stanze -->
+          <button id="back-to-rooms-btn" class="btn secondary" style="margin-top: 20px; width: 100%;">
+            ← Torna alle Stanze
+          </button>
+        </div>
+
+        <!-- Colonna destra: Nemici -->
+        <div class="column enemies-column">
+          <h2>👹 Nemici</h2>
+          <div id="enemies-list" class="characters-list">
+            <!-- Generato da JavaScript -->
+          </div>
+          <div class="add-enemy-form">
+            <input type="text" id="enemy-name" placeholder="Nome nemico" class="effect-input">
+            <select id="enemy-type" class="effect-select">
+              <!-- Popolato dinamicamente da JavaScript -->
+            </select>
+            <input type="number" id="enemy-initiative" placeholder="Init" min="1" class="effect-input small">
+            <button id="add-enemy-btn" class="btn success">+ Nemico</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alleati NPC sempre sotto, a tutta larghezza -->
+      <div class="master-allies-section">
+        <h2 class="allies-section-title">🛡️ Alleati NPC</h2>
+        <div class="master-allies-row">
+          <div id="allies-list" class="characters-list allies-list-inline">
+            <!-- Generato da JavaScript -->
+          </div>
+          <div class="add-ally-form add-ally-inline">
+            <input type="text" id="ally-name" placeholder="Nome alleato" class="effect-input">
+            <select id="ally-type" class="effect-select">
+              <!-- Popolato dinamicamente da JavaScript -->
+            </select>
+            <input type="number" id="ally-initiative" placeholder="Init" min="1" class="effect-input small">
+            <button id="add-ally-btn" class="btn primary">+ Alleato</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Schermata errore (master già connesso) -->
+    <section id="error-screen" class="screen">
+      <div class="error-message">
+        <h2>⚠️ Master già connesso</h2>
+        <p>Un altro dispositivo è già connesso come Master.</p>
+        <a href="/" class="btn primary">Vai alla vista Giocatore</a>
+        <a href="/tablet.html" class="btn secondary">Vai alla vista Tablet</a>
+      </div>
+    </section>
+    
+    <!-- Pop-up per risolvere iniziative uguali -->
+    <div id="initiative-tie-modal" class="modal" style="display:none;">
+      <div class="modal-content">
+        <h2>⚔️ Iniziative Uguali</h2>
+        <p id="tie-message">Chi agisce per primo?</p>
+        <div id="tie-characters" class="tie-selection">
+          <!-- Generato da JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <datalist id="effects-datalist">
+    <!-- Popolato dinamicamente da JavaScript -->
+  </datalist>
+
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <script src="master.js"></script>
+</body>
+</html>
+

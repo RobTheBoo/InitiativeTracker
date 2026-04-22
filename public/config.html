@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+  <title>⚙️ Configurazione - RPG Initiative Tracker</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    .config-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    .config-header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .config-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+      border-bottom: 2px solid var(--border-gold);
+    }
+
+    .config-tab {
+      padding: 15px 30px;
+      background: transparent;
+      border: none;
+      border-bottom: 3px solid transparent;
+      color: var(--text-light);
+      cursor: pointer;
+      font-size: 1.1rem;
+      transition: all 0.3s;
+    }
+
+    .config-tab.active {
+      border-bottom-color: var(--accent-gold);
+      color: var(--accent-gold);
+    }
+
+    .config-tab:hover {
+      color: var(--accent-gold);
+    }
+
+    .config-content {
+      display: none;
+    }
+
+    .config-content.active {
+      display: block;
+    }
+
+    .config-section {
+      background: var(--bg-light);
+      border: 2px solid var(--border-gold);
+      border-radius: 10px;
+      padding: 30px;
+      margin-bottom: 30px;
+    }
+
+    .config-section h2 {
+      color: var(--accent-gold);
+      margin-bottom: 20px;
+    }
+
+    .characters-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .character-config-card {
+      background: var(--bg-dark);
+      border: 2px solid var(--border-gold);
+      border-radius: 10px;
+      padding: 20px;
+      position: relative;
+    }
+
+    .character-config-card .char-preview {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      background: var(--bg-dark);
+    }
+
+    .character-config-card .char-icon-preview {
+      width: 100%;
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 4rem;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      background: var(--bg-dark);
+      border: 2px dashed var(--border-gold);
+    }
+
+    .char-config-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .char-config-form input,
+    .char-config-form select {
+      padding: 10px;
+      background: var(--bg-dark);
+      border: 1px solid var(--border-gold);
+      border-radius: 6px;
+      color: var(--text-light);
+      font-size: 1rem;
+    }
+
+    .char-config-form label {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .file-upload-area {
+      border: 2px dashed var(--border-gold);
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-bottom: 15px;
+    }
+
+    .file-upload-area:hover {
+      background: rgba(212, 175, 55, 0.1);
+    }
+
+    .file-upload-area input[type="file"] {
+      display: none;
+    }
+
+    .add-char-btn {
+      background: var(--accent-green);
+      color: var(--bg-dark);
+      border: none;
+      padding: 15px 30px;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+
+    .delete-char-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: var(--accent-red);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      cursor: pointer;
+      font-size: 1.2rem;
+    }
+  </style>
+</head>
+<body class="master-view">
+  <div class="config-container">
+    <div class="config-header">
+      <h1>⚙️ Configurazione</h1>
+      <p class="subtitle">Gestisci Eroi e Nemici</p>
+      <button id="back-to-rooms-btn" class="btn secondary" style="margin-top: 20px;">
+        ← Torna alle Stanze
+      </button>
+    </div>
+
+    <div class="config-tabs">
+      <button class="config-tab active" data-tab="heroes">⚔️ Eroi</button>
+      <button class="config-tab" data-tab="enemies">👹 Nemici</button>
+      <button class="config-tab" data-tab="allies">🤝 NPC</button>
+      <button class="config-tab" data-tab="effects">✨ Effetti</button>
+      <button class="config-tab" data-tab="summons">🔮 Evocazioni</button>
+    </div>
+
+    <!-- Tab Eroi -->
+    <div id="heroes-tab" class="config-content active">
+      <div class="config-section">
+        <h2>Eroi Configurati</h2>
+        <div id="heroes-grid" class="characters-grid">
+          <!-- Generato da JavaScript -->
+        </div>
+        <button class="add-char-btn" onclick="addNewHero()">+ Aggiungi Eroe</button>
+      </div>
+    </div>
+
+    <!-- Tab Nemici -->
+    <div id="enemies-tab" class="config-content">
+      <div class="config-section">
+        <h2>Nemici Configurati</h2>
+        <div id="enemies-grid" class="characters-grid">
+          <!-- Generato da JavaScript -->
+        </div>
+        <button class="add-char-btn" onclick="addNewEnemy()">+ Aggiungi Nemico</button>
+      </div>
+    </div>
+
+    <!-- Tab NPC -->
+    <div id="allies-tab" class="config-content">
+      <div class="config-section">
+        <h2>NPC Configurati</h2>
+        <div id="allies-grid" class="characters-grid">
+          <!-- Generato da JavaScript -->
+        </div>
+        <button class="add-char-btn" onclick="addNewAlly()">+ Aggiungi NPC</button>
+      </div>
+    </div>
+
+    <!-- Tab Effetti -->
+    <div id="effects-tab" class="config-content">
+      <div class="config-section">
+        <h2>Effetti Configurati</h2>
+        <div id="effects-list" class="characters-grid">
+          <!-- Generato da JavaScript -->
+        </div>
+        <button class="add-char-btn" onclick="addNewEffect()">+ Aggiungi Effetto</button>
+      </div>
+    </div>
+
+    <!-- Tab Evocazioni -->
+    <div id="summons-tab" class="config-content">
+      <div class="config-section">
+        <h2>Evocazioni Configurate</h2>
+        <div id="summons-grid" class="characters-grid">
+          <!-- Generato da JavaScript -->
+        </div>
+        <button class="add-char-btn" onclick="addNewSummon()">+ Aggiungi Evocazione</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal per inserire nome -->
+  <div id="name-modal" class="modal" style="display: none;" onclick="if(event.target === this) cancelModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <h3 id="modal-title">Inserisci Nome</h3>
+      <input type="text" id="modal-input" placeholder="Nome..." autofocus>
+      <div class="modal-buttons">
+        <button class="btn primary" onclick="confirmModal()">Conferma</button>
+        <button class="btn secondary" onclick="cancelModal()">Annulla</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: var(--bg-dark);
+      border: 2px solid var(--border-gold);
+      border-radius: 10px;
+      padding: 30px;
+      min-width: 300px;
+      max-width: 500px;
+    }
+
+    .modal-content h3 {
+      color: var(--accent-gold);
+      margin-bottom: 20px;
+    }
+
+    .modal-content input {
+      width: 100%;
+      padding: 12px;
+      background: var(--bg-light);
+      border: 2px solid var(--border-gold);
+      border-radius: 6px;
+      color: var(--text-light);
+      font-size: 1rem;
+      margin-bottom: 20px;
+      box-sizing: border-box;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+  </style>
+
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <script src="config.js"></script>
+</body>
+</html>
+

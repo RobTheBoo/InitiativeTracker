@@ -1,0 +1,439 @@
+{
+  "spells": [
+    {
+      "id": "bless",
+      "name": "Benedizione",
+      "nameEn": "Bless",
+      "level": 1,
+      "school": "Enchantment",
+      "duration": "1 min/livello",
+      "effect": {
+        "type": "Morale",
+        "target": "Tiri per colpire",
+        "value": 1
+      },
+      "description": "Alleati entro 50 piedi ricevono bonus morale +1 ai tiri per colpire e +1 ai tiri salvezza contro paura."
+    },
+    {
+      "id": "bane",
+      "name": "Anatema",
+      "nameEn": "Bane",
+      "level": 1,
+      "school": "Enchantment",
+      "duration": "1 min/livello",
+      "effect": {
+        "type": "Morale",
+        "target": "Tiri per colpire",
+        "value": -1
+      },
+      "description": "Nemici entro 50 piedi subiscono penalità -1 ai tiri per colpire e -1 ai tiri salvezza contro paura."
+    },
+    {
+      "id": "shield-of-faith",
+      "name": "Scudo della Fede",
+      "nameEn": "Shield of Faith",
+      "level": 1,
+      "school": "Abjuration",
+      "duration": "1 min/livello",
+      "effect": {
+        "type": "Deviazione",
+        "target": "CA",
+        "value": 2
+      },
+      "description": "Il bersaglio riceve bonus deviazione +2 alla CA (+1 ogni 6 livelli, max +5)."
+    },
+    {
+      "id": "mage-armor",
+      "name": "Armatura del Mago",
+      "nameEn": "Mage Armor",
+      "level": 1,
+      "school": "Conjuration",
+      "duration": "1 ora/livello",
+      "effect": {
+        "type": "Armatura",
+        "target": "CA",
+        "value": 4
+      },
+      "description": "Campo di forza invisibile che fornisce bonus armatura +4 alla CA."
+    },
+    {
+      "id": "bulls-strength",
+      "name": "Forza del Toro",
+      "nameEn": "Bull's Strength",
+      "level": 2,
+      "school": "Transmutation",
+      "duration": "1 min/livello",
+      "effect": {
+        "type": "Potenziamento",
+        "target": "Forza",
+        "value": 4
+      },
+      "description": "Il bersaglio riceve bonus potenziamento +4 alla Forza."
+    },
+    {
+      "id": "cats-grace",
+      "name": "Grazia del Gatto",
+      "nameEn": "Cat's Grace",
+      "level": 2,
+      "school": "Transmutation",
+      "duration": "1 min/livello",
+      "effect": {
+        "type": "Potenziamento",
+        "target": "Destrezza",
+        "value": 4
+      },
+      "description": "Il bersaglio riceve bonus potenziamento +4 alla Destrezza."
+    },
+    {
+      "id": "bears-endurance",
+      "name": "Resistenza dell'Orso",
+      "nameEn": "Bear's Endurance",
+      "level": 2,
+      "school": "Transmutation",
+      "duration": "1 min/livello",
+      "effect": {
+        "type": "Potenziamento",
+        "target": "Costituzione",
+        "value": 4
+      },
+      "description": "Il bersaglio riceve bonus potenziamento +4 alla Costituzione."
+    },
+    {
+      "id": "owls-wisdom",
+      "name": "Saggezza del Gufo",
+      "nameEn": "Owl's Wisdom",
+      "level": 2,
+      "school": "Transmutation",
+      "duration": "1 min/livello",
+      "effect": {
+        "type": "Potenziamento",
+        "target": "Saggezza",
+        "value": 4
+      },
+      "description": "Il bersaglio riceve bonus potenziamento +4 alla Saggezza."
+    },
+    {
+      "id": "foxs-cunning",
+      "name": "Astuzia della Volpe",
+      "nameEn": "Fox's Cunning",
+      "level": 2,
+      "school": "Transmutation",
+      "duration": "1 min/livello",
+      "effect": {
+        "type": "Potenziamento",
+        "target": "Intelligenza",
+        "value": 4
+      },
+      "description": "Il bersaglio riceve bonus potenziamento +4 all'Intelligenza."
+    },
+    {
+      "id": "eagles-splendor",
+      "name": "Splendore dell'Aquila",
+      "nameEn": "Eagle's Splendor",
+      "level": 2,
+      "school": "Transmutation",
+      "duration": "1 min/livello",
+      "effect": {
+        "type": "Potenziamento",
+        "target": "Carisma",
+        "value": 4
+      },
+      "description": "Il bersaglio riceve bonus potenziamento +4 al Carisma."
+    },
+    {
+      "id": "heroism",
+      "name": "Eroismo",
+      "nameEn": "Heroism",
+      "level": 3,
+      "school": "Enchantment",
+      "duration": "10 min/livello",
+      "effect": {
+        "type": "Morale",
+        "target": "Tiri per colpire, TS, Abilità",
+        "value": 2
+      },
+      "description": "Il bersaglio riceve bonus morale +2 ai tiri per colpire, tiri salvezza e prove di abilità."
+    },
+    {
+      "id": "greater-heroism",
+      "name": "Eroismo Superiore",
+      "nameEn": "Greater Heroism",
+      "level": 6,
+      "school": "Enchantment",
+      "duration": "1 min/livello",
+      "effect": {
+        "type": "Morale",
+        "target": "Tiri per colpire, TS, Abilità",
+        "value": 4
+      },
+      "description": "Come Eroismo ma bonus +4 e immunità alla paura. Fornisce anche PF temporanei."
+    },
+    {
+      "id": "haste",
+      "name": "Velocità",
+      "nameEn": "Haste",
+      "level": 3,
+      "school": "Transmutation",
+      "duration": "1 round/livello",
+      "effect": {
+        "type": "Senza Tipo",
+        "target": "Tiri per colpire, CA, Riflessi",
+        "value": 1
+      },
+      "description": "+1 ai tiri per colpire, +1 CA (schivare), +1 Riflessi, +30 piedi movimento, attacco extra."
+    },
+    {
+      "id": "slow",
+      "name": "Lentezza",
+      "nameEn": "Slow",
+      "level": 3,
+      "school": "Transmutation",
+      "duration": "1 round/livello",
+      "effect": {
+        "type": "Senza Tipo",
+        "target": "Tiri per colpire, CA, Riflessi",
+        "value": -1
+      },
+      "description": "-1 ai tiri per colpire, -1 CA, -1 Riflessi, velocità dimezzata, solo 1 azione/round."
+    },
+    {
+      "id": "prayer",
+      "name": "Preghiera",
+      "nameEn": "Prayer",
+      "level": 3,
+      "school": "Enchantment",
+      "duration": "1 round/livello",
+      "effect": {
+        "type": "Fortuna",
+        "target": "Tutti i tiri",
+        "value": 1
+      },
+      "description": "Alleati +1 fortuna a tiri per colpire, danni, TS, abilità. Nemici -1 a tutto."
+    },
+    {
+      "id": "divine-favor",
+      "name": "Favore Divino",
+      "nameEn": "Divine Favor",
+      "level": 1,
+      "school": "Evocation",
+      "duration": "1 minuto",
+      "effect": {
+        "type": "Fortuna",
+        "target": "Tiri per colpire e danni",
+        "value": 1
+      },
+      "description": "Bonus fortuna +1 ai tiri per colpire e danni (+1 ogni 3 livelli, max +3)."
+    },
+    {
+      "id": "divine-power",
+      "name": "Potere Divino",
+      "nameEn": "Divine Power",
+      "level": 4,
+      "school": "Evocation",
+      "duration": "1 round/livello",
+      "effect": {
+        "type": "Fortuna",
+        "target": "Tiri per colpire",
+        "value": 1
+      },
+      "description": "BAB uguale al livello, +6 Forza, 1 PF/livello temporaneo."
+    },
+    {
+      "id": "barkskin",
+      "name": "Pelle Coriacea",
+      "nameEn": "Barkskin",
+      "level": 2,
+      "school": "Transmutation",
+      "duration": "10 min/livello",
+      "effect": {
+        "type": "Armatura Naturale",
+        "target": "CA",
+        "value": 2
+      },
+      "description": "Bonus potenziamento +2 all'armatura naturale (+1 ogni 3 livelli oltre il 3°, max +5)."
+    },
+    {
+      "id": "displacement",
+      "name": "Dislocazione",
+      "nameEn": "Displacement",
+      "level": 3,
+      "school": "Illusion",
+      "duration": "1 round/livello",
+      "effect": {
+        "type": "Senza Tipo",
+        "target": "Occultamento",
+        "value": 50
+      },
+      "description": "50% probabilità che gli attacchi ti manchino (occultamento)."
+    },
+    {
+      "id": "blur",
+      "name": "Sfocatura",
+      "nameEn": "Blur",
+      "level": 2,
+      "school": "Illusion",
+      "duration": "1 min/livello",
+      "effect": {
+        "type": "Senza Tipo",
+        "target": "Occultamento",
+        "value": 20
+      },
+      "description": "20% probabilità che gli attacchi ti manchino (occultamento)."
+    },
+    {
+      "id": "mirror-image",
+      "name": "Immagine Speculare",
+      "nameEn": "Mirror Image",
+      "level": 2,
+      "school": "Illusion",
+      "duration": "1 min/livello",
+      "effect": {
+        "type": "Senza Tipo",
+        "target": "Immagini",
+        "value": 0
+      },
+      "description": "Crea 1d4+1 duplicati illusori (max 8). Gli attacchi colpiscono le immagini per primi."
+    },
+    {
+      "id": "invisibility",
+      "name": "Invisibilità",
+      "nameEn": "Invisibility",
+      "level": 2,
+      "school": "Illusion",
+      "duration": "1 min/livello",
+      "effect": {
+        "type": "Senza Tipo",
+        "target": "Invisibilità",
+        "value": 0
+      },
+      "description": "Il bersaglio diventa invisibile. Termina se attacca."
+    },
+    {
+      "id": "greater-invisibility",
+      "name": "Invisibilità Superiore",
+      "nameEn": "Greater Invisibility",
+      "level": 4,
+      "school": "Illusion",
+      "duration": "1 round/livello",
+      "effect": {
+        "type": "Senza Tipo",
+        "target": "Invisibilità",
+        "value": 0
+      },
+      "description": "Come invisibilità ma non termina quando attacchi."
+    },
+    {
+      "id": "stoneskin",
+      "name": "Pelle di Pietra",
+      "nameEn": "Stoneskin",
+      "level": 4,
+      "school": "Abjuration",
+      "duration": "10 min/livello o finché scaricato",
+      "effect": {
+        "type": "Senza Tipo",
+        "target": "RD",
+        "value": 10
+      },
+      "description": "Riduzione del danno 10/adamantio. Ignora fino a 10 punti danno per colpo (max 10/livello totali)."
+    },
+    {
+      "id": "protection-from-evil",
+      "name": "Protezione dal Male",
+      "nameEn": "Protection from Evil",
+      "level": 1,
+      "school": "Abjuration",
+      "duration": "1 min/livello",
+      "effect": {
+        "type": "Deviazione",
+        "target": "CA e TS vs Malvagi",
+        "value": 2
+      },
+      "description": "+2 deviazione alla CA e +2 resistenza ai TS contro creature malvagie."
+    },
+    {
+      "id": "magic-circle-against-evil",
+      "name": "Cerchio Magico contro il Male",
+      "nameEn": "Magic Circle against Evil",
+      "level": 3,
+      "school": "Abjuration",
+      "duration": "10 min/livello",
+      "effect": {
+        "type": "Deviazione",
+        "target": "CA e TS vs Malvagi",
+        "value": 2
+      },
+      "description": "Come Protezione dal Male ma raggio 10 piedi."
+    },
+    {
+      "id": "enlarge-person",
+      "name": "Ingrandire Persone",
+      "nameEn": "Enlarge Person",
+      "level": 1,
+      "school": "Transmutation",
+      "duration": "1 min/livello",
+      "effect": {
+        "type": "Taglia",
+        "target": "Vari",
+        "value": 0
+      },
+      "description": "Taglia +1 categoria. +2 Forza, -2 Destrezza, -1 tiri per colpire, -1 CA."
+    },
+    {
+      "id": "reduce-person",
+      "name": "Ridurre Persone",
+      "nameEn": "Reduce Person",
+      "level": 1,
+      "school": "Transmutation",
+      "duration": "1 min/livello",
+      "effect": {
+        "type": "Taglia",
+        "target": "Vari",
+        "value": 0
+      },
+      "description": "Taglia -1 categoria. +2 Destrezza, -2 Forza, +1 tiri per colpire, +1 CA."
+    },
+    {
+      "id": "rage",
+      "name": "Furia",
+      "nameEn": "Rage",
+      "level": 3,
+      "school": "Enchantment",
+      "duration": "Concentrazione + 1 round/livello",
+      "effect": {
+        "type": "Morale",
+        "target": "Forza, Costituzione",
+        "value": 2
+      },
+      "description": "+2 morale a Forza e Costituzione, +1 morale ai tiri salvezza su Volontà, -2 CA."
+    },
+    {
+      "id": "good-hope",
+      "name": "Buona Speranza",
+      "nameEn": "Good Hope",
+      "level": 3,
+      "school": "Enchantment",
+      "duration": "1 min/livello",
+      "effect": {
+        "type": "Morale",
+        "target": "Tutti i tiri",
+        "value": 2
+      },
+      "description": "+2 morale ai tiri per colpire, danni, TS e prove di abilità."
+    },
+    {
+      "id": "crushing-despair",
+      "name": "Disperazione Opprimente",
+      "nameEn": "Crushing Despair",
+      "level": 4,
+      "school": "Enchantment",
+      "duration": "1 min/livello",
+      "effect": {
+        "type": "Morale",
+        "target": "Tutti i tiri",
+        "value": -2
+      },
+      "description": "-2 ai tiri per colpire, danni, TS e prove di abilità."
+    }
+  ]
+}
+

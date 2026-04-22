@@ -1,0 +1,50 @@
+# Vecchio repo orfano spostato in backup (vedi spiegazione nei commit iniziali)
+.git.broken-backup/
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+out/
+win-unpacked/
+
+# App data (preservato tra build)
+app-data/
+dist/app-data/
+
+# Electron
+*.log
+*.db
+*.db-shm
+*.db-wal
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# User data
+data/rooms/
+data/images/heroes/
+data/images/enemies/
+data/images/allies/
+!data/images/**/.gitkeep
+
+# Temporary
+*.tmp
+*.temp
+
+# Android APK e Keystore
+*.apk
+*.aab
+*.keystore
+android/keystore.properties
+android/app/build/
+

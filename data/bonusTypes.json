@@ -1,0 +1,145 @@
+{
+  "bonusTypes": [
+    {
+      "id": "alchemical",
+      "name": "Alchemico",
+      "nameEn": "Alchemical",
+      "stacks": false,
+      "description": "Bonus da sostanze alchemiche. Non si cumulano tra loro."
+    },
+    {
+      "id": "armor",
+      "name": "Armatura",
+      "nameEn": "Armor",
+      "stacks": false,
+      "description": "Bonus alla CA da armature e oggetti che funzionano come armature."
+    },
+    {
+      "id": "circumstance",
+      "name": "Circostanza",
+      "nameEn": "Circumstance",
+      "stacks": false,
+      "description": "Bonus da condizioni favorevoli. Non si cumulano tra loro."
+    },
+    {
+      "id": "competence",
+      "name": "Competenza",
+      "nameEn": "Competence",
+      "stacks": false,
+      "description": "Bonus che migliora le tue capacità in un'abilità o attività."
+    },
+    {
+      "id": "deflection",
+      "name": "Deviazione",
+      "nameEn": "Deflection",
+      "stacks": false,
+      "description": "Bonus alla CA che devia gli attacchi magicamente."
+    },
+    {
+      "id": "dodge",
+      "name": "Schivare",
+      "nameEn": "Dodge",
+      "stacks": true,
+      "description": "Bonus alla CA per schivare attacchi. SI CUMULANO tra loro!"
+    },
+    {
+      "id": "enhancement",
+      "name": "Potenziamento",
+      "nameEn": "Enhancement",
+      "stacks": false,
+      "description": "Bonus che potenzia un oggetto o caratteristica esistente."
+    },
+    {
+      "id": "inherent",
+      "name": "Inerente",
+      "nameEn": "Inherent",
+      "stacks": false,
+      "description": "Bonus permanente alle caratteristiche (max +5)."
+    },
+    {
+      "id": "insight",
+      "name": "Intuizione",
+      "nameEn": "Insight",
+      "stacks": false,
+      "description": "Bonus da intuizione precognitiva o sesto senso."
+    },
+    {
+      "id": "luck",
+      "name": "Fortuna",
+      "nameEn": "Luck",
+      "stacks": false,
+      "description": "Bonus dalla buona sorte."
+    },
+    {
+      "id": "morale",
+      "name": "Morale",
+      "nameEn": "Morale",
+      "stacks": false,
+      "description": "Bonus da maggiore speranza, coraggio e determinazione."
+    },
+    {
+      "id": "naturalArmor",
+      "name": "Armatura Naturale",
+      "nameEn": "Natural Armor",
+      "stacks": false,
+      "description": "Bonus alla CA dalla pelle dura, scaglie, ecc."
+    },
+    {
+      "id": "profane",
+      "name": "Profano",
+      "nameEn": "Profane",
+      "stacks": false,
+      "description": "Bonus da fonti malvagie o empie."
+    },
+    {
+      "id": "racial",
+      "name": "Razziale",
+      "nameEn": "Racial",
+      "stacks": false,
+      "description": "Bonus dalla tua razza."
+    },
+    {
+      "id": "resistance",
+      "name": "Resistenza",
+      "nameEn": "Resistance",
+      "stacks": false,
+      "description": "Bonus ai tiri salvezza."
+    },
+    {
+      "id": "sacred",
+      "name": "Sacro",
+      "nameEn": "Sacred",
+      "stacks": false,
+      "description": "Bonus da fonti buone o sacre."
+    },
+    {
+      "id": "shield",
+      "name": "Scudo",
+      "nameEn": "Shield",
+      "stacks": false,
+      "description": "Bonus alla CA dagli scudi."
+    },
+    {
+      "id": "size",
+      "name": "Taglia",
+      "nameEn": "Size",
+      "stacks": false,
+      "description": "Bonus o penalità dalla taglia della creatura."
+    },
+    {
+      "id": "trait",
+      "name": "Tratto",
+      "nameEn": "Trait",
+      "stacks": false,
+      "description": "Bonus dai tratti del personaggio."
+    },
+    {
+      "id": "untyped",
+      "name": "Senza Tipo",
+      "nameEn": "Untyped",
+      "stacks": true,
+      "description": "Bonus senza tipo specifico. SI CUMULANO tra loro!"
+    }
+  ]
+}
+

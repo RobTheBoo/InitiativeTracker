@@ -1,0 +1,50 @@
+========================================
+  CONNESSIONE TELEFONO → PC (Rete non raggiungibile)
+========================================
+
+Segui ESATTAMENTE questi passaggi SUL PC, poi sul telefono.
+
+--- SUL PC (dove giri il Master) ---
+
+1. Trova l'IP del PC
+   - Apri CMD (Prompt dei comandi)
+   - Scrivi: ipconfig
+   - Cerca "Scheda LAN wireless Wi-Fi" (o Ethernet)
+   - Annota "Indirizzo IPv4" → es. 192.168.1.5
+
+2. Avvia il server
+   - Nella cartella del progetto: node server.js
+   - Lascia la finestra aperta (deve dire "RPG Initiative Tracker avviato!")
+
+3. Apri il firewall (OBBLIGATORIO)
+   - Tasto DESTRO su APRI-FIREWALL.bat
+   - Clicca "Esegui come amministratore"
+   - Conferma "Sì"
+   - Deve comparire "OK. Regola aggiunta"
+
+4. Verifica che il PC risponda
+   - Sul PC apri il browser
+   - Vai su: http://localhost:3001/api/rooms
+   - Deve apparire qualcosa tipo [{"id":"default","name":"Partita"}]
+   - Se non funziona, il server non è avviato correttamente
+
+--- SUL TELEFONO ---
+
+5. Stessa rete Wi-Fi del PC (NON usare dati mobili)
+
+6. Test dal browser del telefono (prima dell'app)
+   - Apri Chrome (o altro browser) sul telefono
+   - Nella barra indirizzi scrivi: http://192.168.1.5:3001/api/rooms
+     (sostituisci 192.168.1.5 con il TUO Indirizzo IPv4 del passo 1)
+   - Premi Invio
+   - Se vedi una riga con "default" e "Partita" → la rete è OK, poi usa l'app
+   - Se "Impossibile connettersi" o pagina bianca → problema rete/firewall:
+     * Riesegui APRI-FIREWALL.bat come Amministratore
+     * Controlla che PC e telefono siano sulla stessa Wi-Fi
+     * Alcuni router hanno "Isolamento client": disattivalo nelle impostazioni
+
+7. Nell'app Initiative Tracker
+   - Inserisci: 192.168.1.5:3001 (il tuo IP con :3001)
+   - Tocca Connetti
+
+========================================

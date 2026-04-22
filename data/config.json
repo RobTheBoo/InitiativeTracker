@@ -1,0 +1,49 @@
+{
+  "enemies": [
+    {
+      "id": "drago-nero",
+      "name": "Drago Nero",
+      "icon": "👹",
+      "image": "/images/enemies/1767091115555.webp"
+    },
+    {
+      "id": "guardia",
+      "name": "Guardia",
+      "image": "/images/enemies/1767091147112.jpg"
+    },
+    {
+      "id": "demone",
+      "name": "Demone",
+      "image": "/images/enemies/1767091165749.jpg"
+    }
+  ],
+  "heroes": [
+    {
+      "id": "Achenar",
+      "name": "Achenar",
+      "icon": "👤",
+      "image": "/images/heroes/Achenar.jpeg"
+    },
+    {
+      "id": "Gustav",
+      "name": "Gustav",
+      "icon": "👤",
+      "image": "/images/heroes/Gustav.jpeg"
+    }
+  ],
+  "allies": [
+    {
+      "id": "ally-default",
+      "name": "Pit Fiend",
+      "icon": "🤝",
+      "image": "/images/allies/1767091736748.webp"
+    },
+    {
+      "id": "guardia",
+      "name": "Guardia",
+      "image": "/images/allies/1767092009693.jpg"
+    }
+  ],
+  "effects": [],
+  "summons": []
+}

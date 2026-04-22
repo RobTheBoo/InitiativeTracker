@@ -1,0 +1,13 @@
+# Render.com - Deploy con un click da dashboard
+# https://dashboard.render.com → New → Web Service → Connect repo → usa questo progetto
+# Oppure: New → Blueprint → Connect repo (legge render.yaml)
+
+services:
+  - type: web
+    name: rpg-initiative-tracker
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20

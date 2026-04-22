@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Green background circle -->
+  <circle cx="50" cy="50" r="48" fill="#228B22"/>
+  <circle cx="50" cy="50" r="42" fill="#1a5a1a"/>
+  
+  <!-- Black helmet -->
+  <!-- Helmet dome -->
+  <ellipse cx="50" cy="40" rx="28" ry="24" fill="#1a1a1a"/>
+  <!-- Helmet face opening -->
+  <ellipse cx="50" cy="48" rx="16" ry="14" fill="#0a3a0a"/>
+  <!-- Helmet visor slit -->
+  <rect x="30" y="42" width="40" height="4" rx="2" fill="#333"/>
+  <!-- Eye slits -->
+  <rect x="36" y="46" width="10" height="3" fill="#228B22"/>
+  <rect x="54" y="46" width="10" height="3" fill="#228B22"/>
+  <!-- Helmet crest/plume -->
+  <path d="M50 16 Q55 20 50 28 Q45 20 50 16" fill="#2d2d2d"/>
+  <!-- Neck guard -->
+  <path d="M25 55 Q50 70 75 55 L70 65 Q50 78 30 65 Z" fill="#1a1a1a"/>
+  <!-- Highlight -->
+  <ellipse cx="40" cy="32" rx="8" ry="4" fill="#333" opacity="0.5"/>
+</svg>
