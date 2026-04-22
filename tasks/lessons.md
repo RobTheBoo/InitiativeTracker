@@ -90,3 +90,40 @@ ha specificity più alta di qualsiasi selettore).
 
 **Pattern di prevenzione.** No layout in `style="..."` HTML inline. Solo
 classi → CSS. Se serve "modificatore", usare classi modifier (`.combat-effects.is-vertical`).
+
+---
+
+## 2026-04-22 — `\\'` dentro single-quoted string in template literal = SyntaxError silenzioso
+
+Bug critico in `public/master.js` riga 325. Avevo scritto:
+
+```js
+return `
+  <input title="${hasTie ? 'Modifica per cambiare l\\'ordine.' : '...'}" ...>
+`;
+```
+
+Il parser dentro `${...}` torna in modalità JS standard. La stringa
+single-quoted vede:
+- `\\` → unescape a `\`
+- `'` → **chiude la stringa**
+
+Risultato: la stringa diventa `'Modifica per cambiare l\'`, poi il parser
+incontra l'identifier `ordine` e lancia `SyntaxError: Unexpected identifier`.
+
+**Conseguenza.** L'intero file JS non viene parsato → nessuna funzione
+globale registrata → tutti gli `onclick="foo()"` dell'HTML diventano
+no-op silenziosi. L'utente vede "nessun pulsante funziona" senza errori
+visibili (devtools mostrano solo l'errore al primo load).
+
+**Fix.** Mai usare `\'` dentro stringhe single-quoted in `${...}`. Opzioni:
+1. Riformulare il testo per evitare l'apostrofo (scelto qui)
+2. Usare double-quote: `"l'ordine"`
+3. Backtick annidato: `` `l'ordine` ``
+4. Escapare con codepoint: `'l\u0027ordine'`
+
+**Pattern di prevenzione.** SEMPRE `node -c <file.js>` su qualunque file JS
+modificato prima di committare. Errori di sintassi in JS frontend NON sono
+visibili finché qualcuno non apre la pagina nel browser. Aggiungere un
+pre-commit hook `npx eslint --no-eslintrc --parser-options=ecmaVersion:2022
+public/*.js electron/*.js` o almeno `node -c` su tutti i .js touched.
