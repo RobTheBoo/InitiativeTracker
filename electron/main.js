@@ -2,7 +2,7 @@
 // Tutta la logica HTTP / Socket.IO / config / DB sta in src/server/.
 // Qui restano solo: BrowserWindow, IPC, lifecycle dell'app desktop.
 
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const path = require('path');
 const { createServer } = require('../src/server/create-server');
 const { getPrimaryLocalIP, getLocalIPs } = require('../src/server/paths');
@@ -137,6 +137,17 @@ function setupIPCHandlers() {
   ipcMain.handle('open-config', async () => {
     mainWindow.loadFile('public/config.html');
     return { success: true };
+  });
+
+  ipcMain.handle('folder:pick', async (event, opts = {}) => {
+    const defaultPath = opts.defaultPath || (server && server.paths && server.paths.dataDir) || undefined;
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: opts.title || 'Seleziona cartella per Importa/Esporta',
+      defaultPath,
+      properties: ['openDirectory', 'createDirectory']
+    });
+    if (result.canceled || !result.filePaths.length) return { canceled: true };
+    return { canceled: false, folderPath: result.filePaths[0] };
   });
 }
 

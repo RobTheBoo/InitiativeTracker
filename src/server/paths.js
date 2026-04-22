@@ -69,20 +69,16 @@ function buildPaths(opts = {}) {
   ensureDir(imagesBase);
   ['heroes', 'enemies', 'allies', 'summons'].forEach(sub => ensureDir(path.join(imagesBase, sub)));
 
-  // Cache OneDrive: sempre in dataDir (mai in OneDrive!)
-  const cloudCacheDir = ensureDir(path.join(dataDir, 'cloud-cache'));
-
   return {
     dataDir,
     projectRoot,
     isPackaged,
     dbPath: path.join(dataDir, 'rpg-tracker.db'),
     configPath: path.join(dataDir, 'config.json'),
-    cloudConfigPath: path.join(dataDir, 'cloud.json'),
+    folderSyncConfigPath: path.join(dataDir, 'folder-sync.json'),
     publicDir: path.join(projectRoot, 'public'),
     libraryDir: path.join(projectRoot, 'data'),
     imagesBase,
-    cloudCacheDir,
     getImagesPath: (subfolder) => ensureDir(path.join(imagesBase, subfolder)),
     /**
      * URL pubblico relativo per servire un'immagine ai client.

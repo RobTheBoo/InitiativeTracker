@@ -17,6 +17,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getDataPath: () => ipcRenderer.invoke('get-data-path'),
   openDataFolder: () => ipcRenderer.invoke('open-data-folder'),
   
+  // Folder picker per Importa/Esporta cartella sincronizzata
+  pickFolder: (opts) => ipcRenderer.invoke('folder:pick', opts || {}),
+  
   // Eventi
   onServerStarted: (callback) => ipcRenderer.on('server-started', (event, data) => callback(data)),
   

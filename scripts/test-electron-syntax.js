@@ -33,9 +33,9 @@ const mods = [
   '../src/server/config-store',
   '../src/server/library',
   '../src/server/mdns',
-  '../src/cloud/onedrive',
-  '../src/cloud/cloud-config-store',
-  '../src/cloud/cloud-routes',
+  '../src/folder-sync/folder-store',
+  '../src/folder-sync/folder-sync',
+  '../src/folder-sync/folder-routes',
   '../electron/database',
   '../electron/room-manager',
   '../electron/game-logic'

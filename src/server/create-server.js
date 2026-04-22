@@ -15,7 +15,7 @@ const { buildPaths, getLocalIPs, getPrimaryLocalIP } = require('./paths');
 const { ConfigStore } = require('./config-store');
 const { loadLibrary } = require('./library');
 const { startMdns, stopMdns } = require('./mdns');
-const { registerCloudRoutes } = require('../cloud/cloud-routes');
+const { registerFolderRoutes } = require('../folder-sync/folder-routes');
 
 function createServer(opts = {}) {
   const paths = buildPaths(opts);
@@ -191,12 +191,34 @@ function createServer(opts = {}) {
     res.json(fromConfig.length > 0 ? fromConfig : readImagesFolder('allies'));
   });
 
-  // ----- Cloud routes (OneDrive) -----
-  // Registrate PRIMA di registerConfigRoutes cosi' le route di upload possono usare pushSingleFile
-  const cloud = registerCloudRoutes(app, paths, configStore);
+  // ----- Folder sync (Importa/Esporta cartella) -----
+  // L'utente fornisce un path locale (anche dentro OneDrive/Drive sincronizzata
+  // dall'OS) e l'app legge/scrive li' con una struttura standard documentata.
+  // Sostituisce il vecchio sistema Cloud OAuth (rimosso nel 2026-04).
+  const folderSync = registerFolderRoutes(app, paths, configStore, db);
+
+  // Hook: ogni save di stato stanza → schedula auto-export (debounced 3s)
+  if (db && typeof db.saveRoomState === 'function') {
+    const originalSaveRoomState = db.saveRoomState.bind(db);
+    db.saveRoomState = function (roomId, gameState) {
+      const r = originalSaveRoomState(roomId, gameState);
+      try { folderSync.scheduleAutoExport('room-state'); } catch (_) {}
+      return r;
+    };
+  }
+
+  // Hook: ogni update di config (libreria personaggi/effetti) → auto-export
+  if (configStore && typeof configStore.update === 'function') {
+    const originalConfigUpdate = configStore.update.bind(configStore);
+    configStore.update = function (mutator) {
+      const r = originalConfigUpdate(mutator);
+      try { folderSync.scheduleAutoExport('config'); } catch (_) {}
+      return r;
+    };
+  }
 
   // ----- Config CRUD (heroes / enemies / allies / summons / effects) -----
-  registerConfigRoutes(app, configStore, paths, cloud);
+  registerConfigRoutes(app, configStore, paths, folderSync);
 
   // ----- Socket.IO: clientId persistente per gestione robusta dei reclaim -----
   io.on('connection', (socket) => {
@@ -249,7 +271,7 @@ function createServer(opts = {}) {
 }
 
 // ----- Routes config CRUD (estratti per non bloatare createServer) -----
-function registerConfigRoutes(app, configStore, paths, cloud) {
+function registerConfigRoutes(app, configStore, paths, folderSync) {
   function makeUploader(subfolder, idField) {
     const storage = multer.diskStorage({
       destination: (req, file, cb) => cb(null, paths.getImagesPath(subfolder)),
@@ -350,10 +372,9 @@ function registerConfigRoutes(app, configStore, paths, cloud) {
         return c;
       });
 
-      // Best-effort: se OneDrive e' connesso, carica anche su cloud (non blocca la risposta).
-      if (cloud && typeof cloud.pushSingleFile === 'function') {
-        cloud.pushSingleFile(subfolder, path.basename(req.file.path), req.file.path)
-          .catch(() => {});
+      // Auto-export verso cartella sincronizzata (debounced)
+      if (folderSync && typeof folderSync.scheduleAutoExport === 'function') {
+        try { folderSync.scheduleAutoExport('image-upload'); } catch (_) {}
       }
 
       res.json({ success: true, image: imageUrl });

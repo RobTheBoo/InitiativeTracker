@@ -18,6 +18,7 @@ dist/app-data/
 **/cloud-tokens-*.json
 **/cloud-tokens.json
 **/cloud.json
+**/folder-sync.json
 
 # Electron
 *.log

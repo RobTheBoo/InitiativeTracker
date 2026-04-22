@@ -4,8 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
   <title>⚙️ Configurazione - RPG Initiative Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="design-tokens.css">
   <link rel="stylesheet" href="style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="ui-enhancements.css">
+  <link rel="stylesheet" href="responsive.css">
+  <link rel="stylesheet" href="theme-light.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script defer src="theme-toggle.js"></script>
   <style>
     .config-container {
       max-width: 1200px;
@@ -156,20 +163,29 @@
 
     .delete-char-btn {
       position: absolute;
-      top: 10px;
-      right: 10px;
+      top: 8px;
+      right: 8px;
       background: var(--accent-red);
       color: white;
       border: none;
       border-radius: 50%;
-      width: 30px;
-      height: 30px;
+      width: var(--touch-min, 44px);
+      height: var(--touch-min, 44px);
       cursor: pointer;
       font-size: 1.2rem;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform var(--duration-fast, 120ms) var(--ease-out, ease);
     }
+    .delete-char-btn:hover,
+    .delete-char-btn:focus-visible { transform: scale(1.1); }
+    .delete-char-btn:active { transform: scale(0.95); }
   </style>
 </head>
 <body class="master-view">
+  <div class="rpg-theme-toggle-slot" data-theme-toggle-into></div>
   <div class="config-container">
     <div class="config-header">
       <h1>⚙️ Configurazione</h1>
@@ -185,7 +201,7 @@
       <button class="config-tab" data-tab="allies">🤝 NPC</button>
       <button class="config-tab" data-tab="effects">✨ Effetti</button>
       <button class="config-tab" data-tab="summons">🔮 Evocazioni</button>
-      <button class="config-tab" data-tab="cloud">☁️ Cloud</button>
+      <button class="config-tab" data-tab="folder">📁 Importa</button>
     </div>
 
     <!-- Tab Eroi -->
@@ -243,126 +259,110 @@
       </div>
     </div>
 
-    <!-- Tab Cloud (OneDrive + Google Drive) -->
-    <div id="cloud-tab" class="config-content">
+    <!-- Tab Importa (Folder Sync) -->
+    <div id="folder-tab" class="config-content">
       <div class="config-section">
-        <h2>☁️ Backup immagini in cloud</h2>
+        <h2>📁 Importa / Esporta cartella</h2>
         <p style="color: var(--text-light); margin-bottom: 16px; line-height: 1.6;">
-          Carica le immagini di eroi, nemici, alleati ed evocazioni su <strong>OneDrive</strong> e/o <strong>Google Drive</strong>.
-          Cosi' puoi cambiare PC, formattare, riavviare l'app e ritrovare tutte le immagini.
-          <br><strong>Il database SQLite resta sempre locale</strong> (su cloud si corromperebbe). Solo le immagini vanno in cloud.
-          <br>Puoi connettere entrambi i provider: l'upload va in automatico su tutti quelli connessi.
+          Punta l'app a <strong>una cartella locale</strong> (anche dentro <strong>OneDrive</strong>, <strong>Google Drive</strong> o <strong>Dropbox</strong> sincronizzata sul PC).
+          L'app legge e scrive li' usando una struttura standard, cosi' puoi <strong>condividere personaggi e stanze tra piu' PC</strong> senza configurare niente.
+          <br><strong>Vantaggi</strong>: zero OAuth, zero credenziali Microsoft/Google, zero quota limitata, funziona anche offline.
+          <br><strong>Suggerimento</strong>: usa una cartella tipo <code>OneDrive/RPG-Tracker/</code> e l'OS si occupa della sync automatica.
         </p>
 
-        <!-- Card per OneDrive -->
-        <div class="cloud-provider-card" data-provider="onedrive" style="background: var(--bg-dark); border: 1px solid var(--border-gold); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-          <h3 style="color: var(--accent-gold); margin-bottom: 12px;">☁️ OneDrive Personale</h3>
-          <div class="cloud-status-card" style="margin-bottom: 12px;">Caricamento…</div>
-
-          <details class="cloud-setup-details" style="margin-bottom: 12px;">
-            <summary style="cursor: pointer; color: var(--accent-gold); font-weight: bold; padding: 6px 0;">
-              ⚙️ Setup Azure (una-tantum, gratis, 1 minuto)
-            </summary>
-            <div style="padding: 12px; background: var(--bg-light); border-radius: 6px; margin-top: 6px;">
-              <ol style="color: var(--text-light); padding-left: 20px; line-height: 1.7; font-size: 0.9rem;">
-                <li>Vai su <a href="https://portal.azure.com" target="_blank" style="color: var(--accent-gold);">portal.azure.com</a> (login col tuo Microsoft account)</li>
-                <li>Cerca <strong>App registrations</strong> → <strong>+ New registration</strong></li>
-                <li>Nome: <code>RPG Tracker</code> · Account types: <strong>Personal Microsoft accounts only</strong> · Redirect URI vuoto · Register</li>
-                <li><strong>Authentication</strong> → in fondo <strong>"Allow public client flows" = Sì</strong> → Save</li>
-                <li>Overview → copia <strong>Application (client) ID</strong></li>
-              </ol>
-              <div style="display: flex; gap: 8px; margin-top: 10px;">
-                <input type="text" class="cloud-client-id-input" placeholder="Application (client) ID di Azure" 
-                       style="flex: 1; padding: 8px; background: var(--bg-dark); border: 1px solid var(--border-gold); border-radius: 4px; color: var(--text-light); font-family: 'Courier New', monospace; font-size: 0.85rem;" />
-                <button class="btn primary cloud-save-clientid-btn">Salva</button>
-              </div>
-            </div>
-          </details>
-
-          <div class="cloud-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button class="btn primary cloud-connect-btn" style="display:none;">🔐 Connetti</button>
-            <button class="btn primary cloud-sync-btn" style="display:none;">⬇️ Scarica</button>
-            <button class="btn secondary cloud-push-btn" style="display:none;">⬆️ Carica tutto</button>
-            <button class="btn danger cloud-disconnect-btn" style="display:none;">⛔ Disconnetti</button>
+        <!-- Card path corrente -->
+        <div class="folder-card" style="background: var(--bg-dark); border: 1px solid var(--border-gold); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+          <h3 style="color: var(--accent-gold); margin-bottom: 12px;">📂 Cartella sincronizzata</h3>
+          
+          <label style="display:block; color: var(--text-light); margin-bottom: 6px; font-size: 0.9rem;">Path della cartella:</label>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+            <input type="text" id="folder-path-input" placeholder="es. C:\Users\TuoNome\OneDrive\RPG-Tracker"
+                   style="flex: 1; min-width: 240px; padding: 10px; background: var(--bg-light); border: 1px solid var(--border-gold); border-radius: 6px; color: var(--text-light); font-family: 'Courier New', monospace; font-size: 0.9rem;" />
+            <button class="btn secondary" id="folder-browse-btn" style="display:none;">📂 Sfoglia…</button>
+            <button class="btn primary" id="folder-test-btn">🔍 Verifica</button>
+            <button class="btn primary" id="folder-save-btn">💾 Salva</button>
           </div>
+
+          <div id="folder-status-line" style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 12px;">
+            Nessuna cartella configurata.
+          </div>
+
+          <label style="display: flex; align-items: center; gap: 10px; color: var(--text-light); cursor: pointer; padding: 8px 0;">
+            <input type="checkbox" id="folder-auto-export" style="width: 18px; height: 18px; cursor: pointer;" />
+            <span><strong>Auto-export</strong>: dopo ogni modifica importante l'app aggiorna automaticamente la cartella (debounced 3s).</span>
+          </label>
         </div>
 
-        <!-- Card per Google Drive -->
-        <div class="cloud-provider-card" data-provider="gdrive" style="background: var(--bg-dark); border: 1px solid var(--border-gold); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-          <h3 style="color: var(--accent-gold); margin-bottom: 12px;">📂 Google Drive</h3>
-          <div class="cloud-status-card" style="margin-bottom: 12px;">Caricamento…</div>
+        <!-- Card azioni -->
+        <div class="folder-card" style="background: var(--bg-dark); border: 1px solid var(--border-gold); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+          <h3 style="color: var(--accent-gold); margin-bottom: 12px;">🔄 Importa / Esporta</h3>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="btn primary" id="folder-import-btn">📥 Importa dalla cartella</button>
+            <button class="btn primary" id="folder-export-btn">📤 Esporta nella cartella</button>
+          </div>
+          <p style="color: var(--text-dim); font-size: 0.85rem; margin-top: 10px;">
+            Per le stanze gia' esistenti localmente, l'import chiedera' conferma prima di sovrascrivere.
+          </p>
+        </div>
 
-          <details class="cloud-setup-details" style="margin-bottom: 12px;">
-            <summary style="cursor: pointer; color: var(--accent-gold); font-weight: bold; padding: 6px 0;">
-              ⚙️ Setup Google Cloud (una-tantum, gratis, 2 minuti)
-            </summary>
-            <div style="padding: 12px; background: var(--bg-light); border-radius: 6px; margin-top: 6px;">
-              <ol style="color: var(--text-light); padding-left: 20px; line-height: 1.7; font-size: 0.9rem;">
-                <li>Vai su <a href="https://console.cloud.google.com" target="_blank" style="color: var(--accent-gold);">console.cloud.google.com</a> (login col tuo Google account)</li>
-                <li>Crea un nuovo progetto (es. "RPG Tracker") → Select project</li>
-                <li><strong>APIs &amp; Services → Library</strong> → cerca <strong>Google Drive API</strong> → <strong>Enable</strong></li>
-                <li><strong>APIs &amp; Services → OAuth consent screen</strong> → User Type <strong>External</strong> → compila i campi obbligatori → in <strong>Test users</strong> aggiungi il tuo email</li>
-                <li><strong>APIs &amp; Services → Credentials</strong> → <strong>+ Create Credentials → OAuth client ID</strong></li>
-                <li>Application type: <strong>Desktop app</strong> · Name: <code>RPG Tracker</code> → Create</li>
-                <li>Copia il <strong>Client ID</strong> (NON serve il client secret)</li>
-              </ol>
-              <p style="color: var(--text-dim); font-size: 0.8rem; margin-top: 8px;">
-                Lo scope usato e' <code>drive.file</code>: l'app vede SOLO i file che ha creato lei, non tutto il tuo Drive.
+        <!-- Card struttura attesa -->
+        <details class="folder-card" style="background: var(--bg-dark); border: 1px solid var(--border-gold); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+          <summary style="cursor: pointer; color: var(--accent-gold); font-weight: bold; padding: 4px 0;">
+            📋 Struttura della cartella (clicca per dettagli)
+          </summary>
+          <pre style="background: var(--bg-light); padding: 12px; border-radius: 6px; color: var(--text-light); font-size: 0.85rem; overflow-x: auto; margin-top: 12px;"><code>&lt;cartella&gt;/
+├── manifest.json        Metadati (versione, timestamp)
+├── README.md            Auto-generato dall'app
+├── config.json          Libreria personaggi (eroi, nemici, alleati, evocazioni, effetti)
+├── images/
+│   ├── heroes/          Avatar eroi (PNG/JPG/WebP/GIF/SVG)
+│   ├── enemies/         Avatar nemici
+│   ├── allies/          Avatar PNG / NPC
+│   └── summons/         Avatar evocazioni
+└── rooms/
+    └── &lt;room-id&gt;.json   Una stanza per file (metadati + gameState)</code></pre>
+          <p style="color: var(--text-dim); font-size: 0.85rem; margin-top: 8px;">
+            La prima volta che esporti, l'app crea tutto. Da quel momento puoi tenere la cartella in OneDrive
+            e accedere agli stessi dati da casa, ufficio, portatile.
+          </p>
+        </details>
+
+        <!-- Modal conflitti import -->
+        <div id="folder-import-modal" class="modal" style="display: none;">
+          <div class="modal-content" style="max-width: 640px;">
+            <h3>📥 Conferma import</h3>
+            <div id="folder-import-summary" style="color: var(--text-light); margin-bottom: 16px; line-height: 1.6;"></div>
+            
+            <div id="folder-import-conflicts-wrap" style="display: none;">
+              <h4 style="color: var(--accent-gold); margin-bottom: 8px;">⚠️ Stanze gia' esistenti</h4>
+              <p style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 12px;">
+                Per ognuna scegli se sovrascrivere o saltare:
               </p>
-              <div style="display: flex; gap: 8px; margin-top: 10px;">
-                <input type="text" class="cloud-client-id-input" placeholder="Client ID Google (xxxxx.apps.googleusercontent.com)" 
-                       style="flex: 1; padding: 8px; background: var(--bg-dark); border: 1px solid var(--border-gold); border-radius: 4px; color: var(--text-light); font-family: 'Courier New', monospace; font-size: 0.85rem;" />
-                <button class="btn primary cloud-save-clientid-btn">Salva</button>
+              <div id="folder-import-conflicts-list" style="max-height: 280px; overflow-y: auto; margin-bottom: 12px;"></div>
+              <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                <button class="btn secondary tiny" id="folder-conflicts-all-overwrite">Sovrascrivi tutto</button>
+                <button class="btn secondary tiny" id="folder-conflicts-all-skip">Salta tutto</button>
               </div>
             </div>
-          </details>
 
-          <div class="cloud-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button class="btn primary cloud-connect-btn" style="display:none;">🔐 Connetti</button>
-            <button class="btn primary cloud-sync-btn" style="display:none;">⬇️ Scarica</button>
-            <button class="btn secondary cloud-push-btn" style="display:none;">⬆️ Carica tutto</button>
-            <button class="btn danger cloud-disconnect-btn" style="display:none;">⛔ Disconnetti</button>
-          </div>
-        </div>
-
-        <!-- Modal auth (condiviso, riusato) -->
-        <div id="cloud-auth-modal" class="modal" style="display: none;">
-          <div class="modal-content" style="max-width: 560px;">
-            <h3 id="cloud-auth-title">🔐 Connessione…</h3>
-            <p style="color: var(--text-light); margin-bottom: 12px;" id="cloud-auth-intro">
-              Apri questo URL nel browser:
-            </p>
-            <div style="text-align: center; margin: 16px 0;">
-              <a id="cloud-auth-uri" href="#" target="_blank" 
-                 style="font-size: 1.05rem; color: var(--accent-gold); text-decoration: underline; word-break: break-all;">
-                …
-              </a>
-            </div>
-            <div id="cloud-auth-code-wrap" style="display: none;">
-              <p style="color: var(--text-light); margin-bottom: 8px;">E inserisci questo codice:</p>
-              <div id="cloud-auth-code" style="font-family: 'Courier New', monospace; font-size: 2rem; text-align: center; background: var(--bg-light); padding: 16px; border-radius: 6px; letter-spacing: 4px; color: var(--accent-gold); border: 2px dashed var(--border-gold);">
-                ……………
-              </div>
-            </div>
-            <p id="cloud-auth-status" style="margin-top: 16px; text-align: center; color: var(--text-light);">
-              In attesa dell'autorizzazione…
-            </p>
-            <div class="modal-buttons" style="margin-top: 16px;">
-              <button class="btn secondary" id="cloud-auth-cancel-btn">Annulla</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Modal risultato sync/push -->
-        <div id="cloud-result-modal" class="modal" style="display: none;">
-          <div class="modal-content" style="max-width: 600px;">
-            <h3 id="cloud-result-title">Operazione completata</h3>
-            <pre id="cloud-result-body" style="background: var(--bg-light); padding: 12px; border-radius: 6px; max-height: 300px; overflow: auto; white-space: pre-wrap; color: var(--text-light); font-size: 0.85rem;"></pre>
             <div class="modal-buttons">
-              <button class="btn primary" id="cloud-result-close-btn">OK</button>
+              <button class="btn primary" id="folder-import-confirm-btn">📥 Importa</button>
+              <button class="btn secondary" id="folder-import-cancel-btn">Annulla</button>
             </div>
           </div>
         </div>
+
+        <!-- Modal risultato -->
+        <div id="folder-result-modal" class="modal" style="display: none;">
+          <div class="modal-content" style="max-width: 600px;">
+            <h3 id="folder-result-title">Operazione completata</h3>
+            <pre id="folder-result-body" style="background: var(--bg-light); padding: 12px; border-radius: 6px; max-height: 320px; overflow: auto; white-space: pre-wrap; color: var(--text-light); font-size: 0.85rem;"></pre>
+            <div class="modal-buttons">
+              <button class="btn primary" id="folder-result-close-btn">OK</button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -428,7 +428,7 @@
 
   <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
   <script src="config.js"></script>
-  <script src="cloud.js"></script>
+  <script src="folder-sync.js"></script>
 </body>
 </html>
 
