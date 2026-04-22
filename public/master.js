@@ -51,6 +51,7 @@ const socket = io(socketUrl, {
   reconnectionAttempts: Infinity,
   transports: ['websocket', 'polling']
 });
+window.socket = socket; // espone per ui-enhancements.js (toast connessione)
 
 // Log stato connessione
 socket.on('connect', () => {

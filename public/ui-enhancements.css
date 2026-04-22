@@ -1,0 +1,191 @@
+/* UI enhancements aggiuntivi (caricato dopo style.css). Non sostituisce: aggiunge. */
+
+/* === Connection status indicator (toast in alto a destra) === */
+.conn-toast {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 9999;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-family: 'Crimson Text', Georgia, serif;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 15, 25, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(160, 128, 80, 0.4);
+  color: var(--text-light);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  transition: all 0.3s ease;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-8px);
+}
+.conn-toast.visible { opacity: 1; transform: translateY(0); }
+.conn-toast.connected {
+  border-color: rgba(81, 207, 102, 0.5);
+}
+.conn-toast.connected .conn-dot {
+  background: #51cf66;
+  box-shadow: 0 0 8px #51cf66;
+}
+.conn-toast.disconnected {
+  border-color: rgba(255, 107, 107, 0.5);
+}
+.conn-toast.disconnected .conn-dot {
+  background: #ff6b6b;
+  box-shadow: 0 0 8px #ff6b6b;
+  animation: conn-pulse 1.2s ease-in-out infinite;
+}
+.conn-toast.reconnecting {
+  border-color: rgba(255, 215, 0, 0.5);
+}
+.conn-toast.reconnecting .conn-dot {
+  background: #ffd700;
+  box-shadow: 0 0 8px #ffd700;
+  animation: conn-pulse 0.8s ease-in-out infinite;
+}
+.conn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+@keyframes conn-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+/* === Animazione transizione turno tablet === */
+.tablet-view .current-turn-mega {
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+}
+.tablet-view .current-turn-mega.turn-changing {
+  transform: scale(0.92) translateX(-10px);
+  opacity: 0.4;
+}
+.tablet-view .current-turn-mega.turn-arriving {
+  animation: turn-pop-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes turn-pop-in {
+  0% { transform: scale(0.85) translateX(40px); opacity: 0; }
+  60% { transform: scale(1.05) translateX(0); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.tablet-view .turn-portrait,
+.tablet-view #turn-portrait {
+  transition: box-shadow 0.4s ease, transform 0.3s ease;
+}
+.tablet-view .current-turn-mega:not(.turn-changing) .turn-portrait,
+.tablet-view .current-turn-mega:not(.turn-changing) #turn-portrait {
+  box-shadow: 0 0 30px var(--glow-gold), 0 0 60px rgba(240, 198, 116, 0.2);
+}
+
+/* === Card iniziativa: glow del personaggio attivo + smooth highlight === */
+.initiative-bar .turn-card.current,
+.initiative-bar-tablet .tablet-turn-card.current {
+  position: relative;
+  animation: card-active-pulse 2.5s ease-in-out infinite;
+}
+@keyframes card-active-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--accent-gold), 0 0 16px var(--glow-gold); }
+  50%      { box-shadow: 0 0 0 2px var(--accent-gold), 0 0 28px var(--glow-gold); }
+}
+
+/* === Bottoni: hover/active sentite (non aggressive) === */
+.btn { transition: all 0.18s ease; }
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+.btn:active:not(:disabled) {
+  transform: translateY(0);
+  filter: brightness(0.95);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Loading dots inline */
+.loading-dots::after {
+  content: '';
+  display: inline-block;
+  width: 1.2em;
+  text-align: left;
+  animation: loading-dots 1.2s steps(4, end) infinite;
+}
+@keyframes loading-dots {
+  0%   { content: ''; }
+  25%  { content: '.'; }
+  50%  { content: '..'; }
+  75%  { content: '...'; }
+  100% { content: ''; }
+}
+
+/* QR code: piccola animazione al focus, e contrasto ben definito per il telefono */
+#qr-image {
+  transition: transform 0.2s ease;
+}
+#qr-image:hover {
+  transform: scale(1.04);
+  cursor: zoom-in;
+}
+
+/* === Pannello mDNS / IP nel room-selector con icone più marcate === */
+.server-info code {
+  background: rgba(240, 198, 116, 0.12);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+}
+
+/* === Cloud status badges nel master/room-selector === */
+.cloud-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(160, 128, 80, 0.3);
+  color: var(--text-light);
+}
+.cloud-badge.connected {
+  border-color: rgba(81, 207, 102, 0.4);
+  color: #b1f4be;
+}
+.cloud-badge.disconnected {
+  border-color: rgba(160, 128, 80, 0.3);
+  color: var(--text-dim);
+}
+
+/* === Snackbar generico (per notifiche brevi) === */
+.snackbar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(40px);
+  background: rgba(15, 15, 25, 0.95);
+  border: 1px solid var(--border-gold);
+  color: var(--text-light);
+  padding: 12px 22px;
+  border-radius: 8px;
+  z-index: 10000;
+  opacity: 0;
+  transition: all 0.25s ease;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  max-width: 90vw;
+}
+.snackbar.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.snackbar.success { border-color: rgba(81, 207, 102, 0.6); }
+.snackbar.error   { border-color: rgba(255, 107, 107, 0.6); }
+.snackbar.warning { border-color: rgba(255, 215, 0, 0.6); }

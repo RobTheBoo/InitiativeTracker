@@ -7,6 +7,7 @@
   <title>🎲 Initiative Tracker - Giocatore</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="ui-enhancements.css">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital@0;1&display=swap" rel="stylesheet">
   <script>
     // Definisci connectToServerHandler immediatamente come stub
@@ -329,6 +330,7 @@
   <!-- Socket.IO: locale per funzionare in APK/WebView senza dipendere dal CDN -->
   <script src="socket.io.min.js"></script>
   <script src="app.js"></script>
+  <script src="ui-enhancements.js"></script>
   <script>
     // Registrazione Service Worker per PWA solo in browser (non in app Capacitor/Electron)
     var isNative = (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) || (window.electronAPI && window.electronAPI.isElectron);

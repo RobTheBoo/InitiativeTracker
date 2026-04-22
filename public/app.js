@@ -260,6 +260,7 @@ if (isCapacitorApp && !socketUrl) {
     transports: ['websocket', 'polling']
   });
 }
+window.socket = socket;
 
 // Stato locale
 let gameState = null;

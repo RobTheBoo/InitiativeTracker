@@ -28,6 +28,7 @@ const socket = io(socketUrl, {
   reconnectionAttempts: Infinity,
   transports: ['websocket', 'polling']
 });
+window.socket = socket;
 
 // Stato locale
 let gameState = null;
@@ -274,6 +275,11 @@ function updateUI() {
     renderCurrentTurn();
     renderInitiativeBar();
     renderAreaEffects();
+    // Anima la transizione di turno se cambiata
+    if (window.RPG_UI && typeof window.RPG_UI.animateTurnChange === 'function') {
+      const el = document.getElementById('current-turn-container');
+      window.RPG_UI.animateTurnChange(el, gameState.currentTurn);
+    }
   } else {
     showCombat(false);
     renderWaitingPlayers();
