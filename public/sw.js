@@ -1,11 +1,14 @@
 // Service Worker per RPG Initiative Tracker - Vista Giocatore (PWA)
 
-const CACHE_NAME = 'rpg-tracker-pwa-v1';
+const CACHE_NAME = 'rpg-tracker-pwa-v3';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/style.css',
+  '/ui-enhancements.css',
   '/app.js',
+  '/ui-enhancements.js',
+  '/socket.io.min.js',
   '/manifest.webmanifest',
   '/icon.png'
 ];
