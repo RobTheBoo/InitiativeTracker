@@ -200,8 +200,20 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('before-quit', async () => {
-  if (server) {
+// Shutdown pulito: blocca app.quit() finche' il server non ha rilasciato
+// le porte / socket / handle DB. Senza questo, su Windows il processo
+// "RPG Initiative Tracker.exe" puo' restare vivo dopo la chiusura della
+// finestra (socket.io connesse + better-sqlite3 handle), bloccando il
+// successivo installer di un upgrade.
+let isQuitting = false;
+app.on('before-quit', (event) => {
+  if (isQuitting || !server) return;
+  event.preventDefault();
+  isQuitting = true;
+  (async () => {
     try { await server.close(); } catch (_) {}
-  }
+    // hard exit per sicurezza (max 2s)
+    setTimeout(() => process.exit(0), 2000).unref();
+    app.quit();
+  })();
 });

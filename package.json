@@ -42,7 +42,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "RPG Initiative Tracker",
-      "artifactName": "RPG-Initiative-Tracker-Setup-${version}.${ext}"
+      "artifactName": "RPG-Initiative-Tracker-Setup-${version}.${ext}",
+      "include": "build/installer.nsh"
     },
     "mac": {
       "target": [
