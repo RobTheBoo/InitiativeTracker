@@ -312,9 +312,19 @@
 
     setStatusLine('⏳ Inizializzazione struttura cartella…', 'var(--accent-gold)');
     try {
-      const data = await apiPost('/api/folder/setup', { folderPath, autoExport: true, doExport: true });
+      const data = await apiPost('/api/folder/setup', { folderPath, autoExport: true });
       $('folder-path-input').value = data.folderPath;
       $('folder-auto-export').checked = true;
+
+      // Se la cartella scelta contiene gia' un export (es. cartella OneDrive
+      // popolata da un altro PC), il backend NON ha esportato. Proponiamo
+      // l'import dei dati remoti.
+      if (data.existingDataDetected) {
+        await refreshStatus();
+        await offerImportExistingData(data);
+        return;
+      }
+
       const created = (data.structureCreated && data.structureCreated.created) || [];
       const exp = data.exportResult || {};
       const lines = [
@@ -338,6 +348,123 @@
     } catch (e) {
       setStatusLine('❌ Setup fallito: ' + e.message, '#ff6b6b');
     }
+  }
+
+  // Cartella scelta gia' contiene un export (manifest presente).
+  // Chiede all'utente cosa fare: importare qui, sovrascrivere col PC locale, o niente.
+  async function offerImportExistingData(setupData) {
+    const folderPath = setupData.folderPath;
+    let analysis;
+    try {
+      analysis = await apiPost('/api/folder/analyze-import', { folderPath });
+    } catch (e) {
+      showResultModal('❌ Errore analisi cartella', e.message);
+      return;
+    }
+
+    const m = setupData.manifest || {};
+    const cfgC = analysis.configCounts || {};
+    const totalLib = (cfgC.heroes || 0) + (cfgC.enemies || 0) + (cfgC.allies || 0)
+                   + (cfgC.summons || 0) + (cfgC.effects || 0);
+    const expDate = m.exportedAt ? formatTs(m.exportedAt) : 'data ignota';
+
+    const summary =
+      `📂 ${folderPath}\n\n` +
+      `Questa cartella contiene gia' un export di RPG Initiative Tracker:\n` +
+      `   • Esportato il: ${expDate}\n` +
+      `   • Libreria: ${totalLib} elementi (eroi:${cfgC.heroes||0}, nemici:${cfgC.enemies||0}, NPC:${cfgC.allies||0}, evocazioni:${cfgC.summons||0}, effetti:${cfgC.effects||0})\n` +
+      `   • Stanze: ${analysis.rooms.length}\n` +
+      `   • Immagini: ${analysis.imageCount}\n\n` +
+      `Cosa vuoi fare?`;
+
+    // Modale con 3 azioni
+    showChoiceModal('📥 Cartella gia\u0027 popolata', summary, [
+      { label: '📥 Importa tutto su questo PC (consigliato)', kind: 'primary', value: 'import-all' },
+      { label: '📤 Sovrascrivi cartella con dati di questo PC', kind: 'secondary', value: 'force-export' },
+      { label: '✋ Niente per ora (solo imposta path)', kind: 'secondary', value: 'noop' }
+    ], async (choice) => {
+      if (choice === 'import-all') {
+        // Import con overwrite di TUTTE le rooms in conflitto.
+        try {
+          const resolutions = {};
+          analysis.rooms.filter(r => r.exists).forEach(r => { resolutions[r.id] = 'overwrite'; });
+          const result = await apiPost('/api/folder/import', { folderPath, resolutions });
+          const lines = [
+            '✅ Import completato dalla cartella esistente',
+            '',
+            `⚙️  Libreria: ${result.configImported ? 'importata' : 'non presente'}`,
+            `🖼️  Immagini: ${result.images.copied} copiate (errori: ${result.images.errors.length})`,
+            `🏰 Stanze: ${result.rooms.created} create, ${result.rooms.overwritten} sovrascritte (errori: ${result.rooms.errors.length})`,
+            '',
+            '🎉 Adesso questo PC ha tutti i nemici, NPC, effetti, eroi, evocazioni',
+            '   e stanze del PC originale.'
+          ];
+          showResultModal('📥 Dati importati', lines.join('\n'));
+          await refreshStatus();
+          // Reload pagina per rigenerare le grid (config.js carica al boot)
+          setTimeout(() => location.reload(), 1500);
+        } catch (e) {
+          showResultModal('❌ Import fallito', e.message);
+        }
+      } else if (choice === 'force-export') {
+        // L'utente sa quel che fa: sovrascrive cartella remota.
+        if (!confirm('Sovrascrivere i dati della cartella con lo stato di questo PC?\nI dati nella cartella verranno persi.')) return;
+        try {
+          const data = await apiPost('/api/folder/setup', { folderPath, autoExport: true, forceExport: true });
+          const exp = data.exportResult || {};
+          showResultModal('📤 Cartella sovrascritta', [
+            '✅ Cartella aggiornata con i dati di questo PC',
+            `📤 ${exp.rooms?.written || 0} stanze, ${exp.images?.copied || 0} immagini`
+          ].join('\n'));
+          await refreshStatus();
+        } catch (e) {
+          showResultModal('❌ Export fallito', e.message);
+        }
+      } else {
+        // noop: path gia' salvato dal setup, nessuna operazione dati.
+        showResultModal('✋ Cartella collegata', [
+          'Path salvato: ' + folderPath,
+          '',
+          'Quando vuoi puoi premere "📥 Importa dalla cartella" o',
+          '"📤 Esporta nella cartella" qui sotto.'
+        ].join('\n'));
+      }
+    });
+  }
+
+  // Modale generica con N opzioni a bottone (usa la stessa griglia visiva del result modal).
+  function showChoiceModal(title, body, choices, onChoice) {
+    $('folder-result-title').textContent = title;
+    const bodyEl = $('folder-result-body');
+    bodyEl.textContent = body;
+
+    // Iniettiamo i bottoni custom dentro il modal-buttons.
+    const modal = $('folder-result-modal');
+    const btnRow = modal.querySelector('.modal-buttons');
+    const closeBtn = $('folder-result-close-btn');
+    if (closeBtn) closeBtn.style.display = 'none';
+
+    // Rimuovi eventuali bottoni custom precedenti
+    btnRow.querySelectorAll('.choice-btn').forEach(b => b.remove());
+
+    choices.forEach(ch => {
+      const b = document.createElement('button');
+      b.className = 'btn choice-btn ' + (ch.kind === 'primary' ? 'primary' : 'secondary');
+      b.textContent = ch.label;
+      b.style.flex = '1';
+      b.style.minWidth = '180px';
+      b.addEventListener('click', async () => {
+        // Cleanup
+        btnRow.querySelectorAll('.choice-btn').forEach(x => x.remove());
+        if (closeBtn) closeBtn.style.display = '';
+        modal.style.display = 'none';
+        try { await onChoice(ch.value); } catch (e) { console.error(e); }
+      });
+      btnRow.insertBefore(b, closeBtn || null);
+    });
+
+    btnRow.style.flexWrap = 'wrap';
+    modal.style.display = 'flex';
   }
 
   // ----- Bind -----
