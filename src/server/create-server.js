@@ -14,6 +14,7 @@ const RoomManager = require('../../electron/room-manager');
 const { buildPaths, getLocalIPs, getPrimaryLocalIP } = require('./paths');
 const { ConfigStore } = require('./config-store');
 const { loadLibrary } = require('./library');
+const { startMdns, stopMdns } = require('./mdns');
 
 function createServer(opts = {}) {
   const paths = buildPaths(opts);
@@ -66,13 +67,39 @@ function createServer(opts = {}) {
   // ----- Server info (per discovery e per QR) -----
   app.get('/api/server-info', (req, res) => {
     const port = httpServer.address()?.port || opts.port;
+    const primaryIp = getPrimaryLocalIP();
     res.json({
       ips: getLocalIPs(),
-      primaryIp: getPrimaryLocalIP(),
+      primaryIp,
       port,
       hostname: require('os').hostname(),
-      appName: 'RPG Initiative Tracker'
+      mdnsHost: 'rpg-tracker.local',
+      appName: 'RPG Initiative Tracker',
+      // URL pronto da mostrare in QR (preferisce mDNS hostname per stabilita')
+      playerUrl: `http://${primaryIp}:${port}/`,
+      tabletUrl: `http://${primaryIp}:${port}/tablet.html`,
+      version: require('../../package.json').version
     });
+  });
+
+  // ----- QR code immagine PNG per onboarding rapido del telefono -----
+  app.get('/api/qr', async (req, res) => {
+    try {
+      const QRCode = require('qrcode');
+      const target = req.query.url || req.query.target;
+      const port = httpServer.address()?.port || opts.port;
+      const url = target || `http://${getPrimaryLocalIP()}:${port}/`;
+      const buf = await QRCode.toBuffer(url, {
+        width: parseInt(req.query.size || '320', 10),
+        margin: 1,
+        color: { dark: '#1a1a2e', light: '#f0c674' }
+      });
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'no-store');
+      res.send(buf);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   // ----- Library API -----
@@ -173,20 +200,30 @@ function createServer(opts = {}) {
     roomManager.handleConnection(socket);
   });
 
-  function close() {
-    return new Promise((resolve) => {
-      try { configStore.flush(); } catch (_) {}
-      try { db.close(); } catch (_) {}
-      try { io.close(); } catch (_) {}
-      httpServer.close(() => resolve());
-    });
+  async function close() {
+    try { await stopMdns(); } catch (_) {}
+    try { configStore.flush(); } catch (_) {}
+    try { db.close(); } catch (_) {}
+    try { io.close(); } catch (_) {}
+    return new Promise((resolve) => httpServer.close(() => resolve()));
   }
 
   function listen(port = opts.port || 3001, host = opts.host || '0.0.0.0') {
     return new Promise((resolve, reject) => {
       httpServer.once('error', reject);
-      httpServer.listen(port, host, () => {
+      httpServer.listen(port, host, async () => {
         const addr = httpServer.address();
+        // Avvia mDNS in modo non bloccante: se fallisce, il server resta su.
+        if (opts.enableMdns !== false) {
+          try {
+            await startMdns(addr.port, {
+              version: require('../../package.json').version,
+              hostname: 'rpg-tracker'
+            });
+          } catch (e) {
+            console.warn('⚠️ mDNS non avviato:', e.message);
+          }
+        }
         resolve({ port: addr.port, host });
       });
     });

@@ -134,6 +134,63 @@ window.connectToServerHandler = async function(e) {
   }
 };
 
+// Auto-discovery: prova a trovare il server master sulla LAN senza inserire l'IP a mano.
+// Strategie:
+//  1. mDNS hostname "rpg-tracker.local" (funziona su iPhone/iPad nativo, su Android moderno
+//     funziona se il telefono supporta mDNS - molti lo fanno via NSD service)
+//  2. Se conosciamo il subnet del telefono via WebRTC (cosa rara), provarlo
+//  3. Lista di candidati comuni: IP gateway -> .1, .2, .254, ecc.
+window.tryAutoDiscover = async function() {
+  const ipInput = document.getElementById('server-ip-input');
+  const statusDiv = document.getElementById('server-ip-status');
+  const debugContent = document.getElementById('debug-content');
+
+  if (statusDiv) statusDiv.innerHTML = '<span style="color:#ffd700;">🔍 Sto cercando il Master sulla rete...</span>';
+
+  const candidates = [
+    'rpg-tracker.local:3001',
+    'rpg-tracker:3001'
+  ];
+
+  // Aggiungi candidati basati sull'IP corrente (se siamo gia' su una rete locale via PWA)
+  try {
+    const here = window.location.hostname;
+    if (here && /^\d+\.\d+\.\d+\.\d+$/.test(here)) {
+      const parts = here.split('.');
+      // Stessa subnet: prova .1, .254
+      for (const last of [1, 254]) {
+        candidates.push(`${parts[0]}.${parts[1]}.${parts[2]}.${last}:3001`);
+      }
+    }
+  } catch (_) {}
+
+  for (const cand of candidates) {
+    const url = `http://${cand}`;
+    if (debugContent) debugContent.textContent = '🔍 Provo: ' + url;
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 1500);
+      const res = await fetch(`${url}/api/health`, { signal: ctrl.signal });
+      clearTimeout(t);
+      if (res.ok) {
+        if (ipInput) ipInput.value = cand;
+        if (statusDiv) statusDiv.innerHTML = `<span style="color:#51cf66;">✅ Trovato: ${cand}</span>`;
+        if (debugContent) debugContent.textContent = '✅ Master trovato a ' + url + '\nClicca "Connetti" per procedere.';
+        return cand;
+      }
+    } catch (_) { /* prossimo candidato */ }
+  }
+
+  if (statusDiv) statusDiv.innerHTML = '<span style="color:#ff6b6b;">❌ Nessun Master trovato. Inserisci l\'IP manualmente o scansiona il QR.</span>';
+  if (debugContent) debugContent.textContent = '❌ Auto-discovery fallita.\nProva: rpg-tracker.local:3001\nOppure leggi l\'IP dalla schermata del Master.';
+  return null;
+};
+
+// Apri scanner QR (placeholder, per ora apre solo la fotocamera del telefono se nativo)
+window.openQrScanner = function() {
+  alert('Scanner QR: prossima versione. Per ora inquadra il QR sul Master e leggi l\'IP, poi inseriscilo qui.');
+};
+
 // Funzione per adattare l'altezza del viewport su Android
 function adjustViewportHeight() {
   const vh = window.innerHeight * 0.01;

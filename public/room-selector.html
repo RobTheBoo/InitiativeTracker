@@ -175,11 +175,25 @@
       </div>
     </div>
 
-    <!-- Info Server (solo IP per i giocatori) -->
+    <!-- Info Server: IP + QR code per onboarding rapido dei telefoni -->
     <div class="server-info">
-      <div class="server-label">I giocatori si connettono a questo IP:</div>
-      <div class="server-ip" id="server-ip">http://localhost:3001</div>
-      <div id="server-error" style="display:none; color: #ff6b6b; margin-top: 10px; font-size: 0.9rem;"></div>
+      <div style="display: flex; gap: 30px; align-items: center; justify-content: center; flex-wrap: wrap;">
+        <div style="text-align: center;">
+          <div class="server-label">I giocatori si connettono a:</div>
+          <div class="server-ip" id="server-ip">http://localhost:3001</div>
+          <div id="server-ip-alt" style="margin-top: 6px; font-size: 0.85rem; color: var(--text-dim); font-family: 'Courier New', monospace;"></div>
+          <div style="margin-top: 8px; font-size: 0.8rem; color: var(--text-dim);">
+            oppure cerca <code style="color: var(--accent-gold);">rpg-tracker.local</code> dal browser
+          </div>
+          <div id="server-error" style="display:none; color: #ff6b6b; margin-top: 10px; font-size: 0.9rem;"></div>
+        </div>
+        <div style="text-align: center;">
+          <div class="server-label" style="margin-bottom: 8px;">Inquadra col telefono</div>
+          <div id="qr-container" style="background: var(--accent-gold); padding: 8px; border-radius: 12px; display: inline-block; line-height: 0;">
+            <img id="qr-image" alt="QR code di connessione" style="display: block; width: 180px; height: 180px; border-radius: 6px;" />
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Crea Nuova Stanza -->

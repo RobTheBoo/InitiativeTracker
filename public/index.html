@@ -58,7 +58,7 @@
           <input type="text" 
                  id="server-ip-input" 
                  class="room-name-input" 
-                 placeholder="192.168.1.27:3001 oppure 10.0.2.2:3001 (emulatore)"
+                 placeholder="rpg-tracker.local:3001 oppure 192.168.1.27:3001"
                  style="flex: 1; font-size: 1rem; padding: 14px; min-height: 44px; -webkit-user-select: text; user-select: text;"
                  tabindex="0"
                  autocomplete="off">
@@ -68,6 +68,12 @@
           </button>
         </div>
         <div id="server-ip-status" style="margin-top: 10px; font-size: 0.85rem; min-height: 20px;"></div>
+        <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="button" id="auto-discover-btn" class="btn secondary small" style="font-size: 0.85rem;"
+                  onclick="if(window.tryAutoDiscover){event.preventDefault();window.tryAutoDiscover();}">🔍 Trova automaticamente</button>
+          <button type="button" id="scan-qr-btn" class="btn secondary small" style="font-size: 0.85rem; display:none;"
+                  onclick="if(window.openQrScanner){event.preventDefault();window.openQrScanner();}">📷 Scansiona QR</button>
+        </div>
         <!-- Area Debug - SEMPRE VISIBILE -->
         <div id="debug-area" style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; font-size: 0.8rem; border: 1px solid rgba(255,255,255,0.1);">
           <div style="font-weight: bold; margin-bottom: 5px; color: var(--text-muted);">🔍 Debug Info:</div>

@@ -218,61 +218,56 @@ async function showDataPath() {
 
 window.showDataPath = showDataPath;
 
-// Carica IP server (stesso URL del tablet, quello a cui si connettono i giocatori)
+// Carica info server: IP primario, IP alternativi, popola QR code per onboarding telefoni.
+// Endpoint usato: /api/server-info (esposto da src/server/create-server.js)
 async function loadServerIP() {
+  const errorDiv = document.getElementById('server-error');
+  if (errorDiv) errorDiv.style.display = 'none';
+  const serverIpElement = document.getElementById('server-ip');
+  const altElement = document.getElementById('server-ip-alt');
+  const qrImg = document.getElementById('qr-image');
+
+  if (!serverIpElement) return;
+  serverIpElement.textContent = 'http://localhost:3001';
+
   try {
-    const errorDiv = document.getElementById('server-error');
-    if (errorDiv) errorDiv.style.display = 'none';
-    
-    const serverIpElement = document.getElementById('server-ip');
-    if (!serverIpElement) {
-      console.error('Elemento server-ip non trovato');
-      return;
+    const res = await fetch('/api/server-info', { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const info = await res.json();
+
+    const primaryUrl = info.playerUrl || `http://${info.primaryIp}:${info.port}/`;
+    serverIpElement.textContent = primaryUrl.replace(/\/$/, '');
+
+    // Mostra IP alternativi se ce ne sono multipli (utile su PC con piu' interfacce di rete)
+    if (Array.isArray(info.ips) && info.ips.length > 1 && altElement) {
+      const others = info.ips
+        .filter(i => i.address !== info.primaryIp)
+        .map(i => `${i.address}:${info.port}`);
+      if (others.length > 0) {
+        altElement.innerHTML = 'Alternativi: ' + others.map(u => `<span>${u}</span>`).join(', ');
+      }
     }
 
-    // Imposta subito un valore di fallback visibile (almeno localhost)
-    // così non rimane mai "Caricamento..." se qualcosa va storto
-    serverIpElement.textContent = 'http://localhost:3001';
-    
-    if (isElectron) {
-      // Electron: usa le API
+    if (qrImg) {
+      qrImg.src = `/api/qr?url=${encodeURIComponent(primaryUrl)}&size=320`;
+      qrImg.alt = 'QR per ' + primaryUrl;
+    }
+  } catch (e) {
+    console.warn('⚠️ /api/server-info non disponibile, fallback Electron API:', e.message);
+    if (isElectron && window.electronAPI && window.electronAPI.getServerIP) {
       try {
-        console.log('🔍 Richiesta IP server...');
         const { ip, port } = await window.electronAPI.getServerIP();
-        console.log('✅ IP ricevuto:', ip, port);
-        
-        // Mostra l'URL completo a cui i giocatori si connettono (stesso del tablet)
         const serverUrl = `http://${ip}:${port}`;
         serverIpElement.textContent = serverUrl;
-        console.log('📡 Server URL impostato:', serverUrl);
-        
-        // Electron non ha bisogno di testare la connessione (è il server stesso)
-        if (false) {
-          testServerConnection(serverUrl).catch(err => {
-            console.warn('⚠️ Test connessione fallito (non critico):', err);
-          });
-        }
-      } catch (error) {
-        console.error('❌ Errore caricamento IP:', error);
-        // Fallback: mostra almeno localhost
-        serverIpElement.textContent = 'http://localhost:3001';
-        if (errorDiv) {
-          showServerError('Impossibile trovare l\'IP di rete. Usa localhost o inserisci manualmente l\'IP del Master.');
-        }
+        if (qrImg) qrImg.src = `/api/qr?url=${encodeURIComponent(serverUrl)}`;
+      } catch (err) {
+        if (errorDiv) showServerError('Impossibile rilevare l\'IP. Inserisci manualmente sul telefono.');
       }
     } else {
-      // In browser, usa l'URL corrente
-      serverIpElement.textContent = window.location.origin;
-    }
-  } catch (error) {
-    console.error('❌ Errore generale loadServerIP:', error);
-    const serverIpElement = document.getElementById('server-ip');
-    if (serverIpElement) {
-      serverIpElement.textContent = 'Errore';
-    }
-    const errorDiv = document.getElementById('server-error');
-    if (errorDiv) {
-      showServerError('Errore nel caricamento dell\'IP del server.');
+      // Browser: usa origin
+      const origin = window.location.origin;
+      serverIpElement.textContent = origin;
+      if (qrImg) qrImg.src = `/api/qr?url=${encodeURIComponent(origin + '/')}`;
     }
   }
 }
