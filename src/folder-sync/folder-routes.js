@@ -80,14 +80,23 @@ function registerFolderRoutes(app, paths, configStore, db) {
     res.json(result);
   });
 
-  // ----- Setup one-shot: crea cartella + struttura + salva path + auto-export ON -----
-  // Usato dal "wizard primo avvio" e dal pulsante "Setup automatico" in config.
-  // Body: { folderPath, autoExport?:bool=true, doExport?:bool=true }
-  // Returns: { ok, folderPath, structureCreated, exportResult? }
+  // ----- Setup one-shot intelligente -----
+  // Comportamento:
+  //   - Se la cartella e' VUOTA (no manifest): scaffold + export locale + salva path.
+  //   - Se la cartella ha GIA' un manifest (export esistente da un altro PC):
+  //     scaffold + salva path MA NON esporta (non vogliamo sovrascrivere i dati
+  //     remoti con lo stato vuoto locale). Ritorna existingDataDetected: true
+  //     cosi' il frontend chiede "vuoi importarli?".
+  //
+  // Body:
+  //   { folderPath, autoExport?:bool=true, forceExport?:bool=false }
+  //   forceExport=true forza l'export anche se esiste un manifest (override esplicito).
+  // Returns:
+  //   { ok, folderPath, structureCreated, existingDataDetected, manifest, exportResult? }
   app.post('/api/folder/setup', async (req, res) => {
     const folderPath = (req.body && req.body.folderPath || '').trim();
     const autoExport = req.body && typeof req.body.autoExport === 'boolean' ? req.body.autoExport : true;
-    const doExport = req.body && typeof req.body.doExport === 'boolean' ? req.body.doExport : true;
+    const forceExport = !!(req.body && req.body.forceExport);
     if (!folderPath) return res.status(400).json({ error: 'folderPath richiesto' });
 
     try {
@@ -95,16 +104,22 @@ function registerFolderRoutes(app, paths, configStore, db) {
       if (!usable.ok) return res.status(400).json({ error: usable.error });
 
       const structure = folderSync.scaffoldFolder(folderPath);
+      const manifest = folderSync.readManifest(folderPath);
+      const existingDataDetected = !!manifest;
+
+      // SAFETY: se ci sono dati esistenti e l'utente non ha forzato, NON esportiamo.
+      // Cosi' il frontend puo' chiedere "vuoi importarli?" senza distruggere i remoti.
+      const shouldExport = forceExport || !existingDataDetected;
 
       let exportResult = null;
-      if (doExport) {
+      if (shouldExport) {
         exportResult = await folderSync.exportFolder(folderPath, deps);
       }
 
       store.update(c => {
         c.folderPath = folderPath;
         c.autoExport = autoExport;
-        c.lastExportAt = doExport ? Date.now() : c.lastExportAt;
+        if (shouldExport) c.lastExportAt = Date.now();
         return c;
       });
 
@@ -112,6 +127,8 @@ function registerFolderRoutes(app, paths, configStore, db) {
         ok: true,
         folderPath,
         structureCreated: structure,
+        existingDataDetected,
+        manifest,
         exportResult
       });
     } catch (e) {
