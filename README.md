@@ -8,14 +8,26 @@ Applicazione desktop (Electron) per gestire combattimenti di ruolo con sistema d
 
 ## Funzionalità
 
-- ✅ Gestione iniziativa e turni di combattimento
-- ✅ Supporto per Eroi, Nemici e Alleati NPC
-- ✅ Effetti e condizioni sui personaggi
-- ✅ Effetti ad area
-- ✅ Libreria Pathfinder 1E (condizioni, bonus, incantesimi)
-- ✅ Interfaccia Master separata
-- ✅ Vista Tablet per display pubblici
-- ✅ Supporto multi-giocatore tramite rete locale
+### Gioco
+- ✅ Gestione iniziativa e turni di combattimento (Pathfinder 1E)
+- ✅ Eroi (giocatori), Nemici (master), Alleati NPC (master), Evocazioni (giocatori)
+- ✅ Effetti su personaggio + Effetti ad area, con decremento automatico per round
+- ✅ Risoluzione iniziative uguali via popup Master
+- ✅ "Ritarda turno" (delay) e ripristino con scelta posizione
+- ✅ Libreria Pathfinder 1E (condizioni, tipi di bonus, incantesimi) consultabile
+
+### Architettura
+- ✅ **3 viste**: Master (PC), Giocatore (telefono in browser/PWA o APK), Tablet (display per il tavolo)
+- ✅ **Una sola codebase server** condivisa tra Electron e modalità headless
+- ✅ **clientId persistente**: il giocatore non perde il personaggio se ricarica la pagina o chiude la app
+- ✅ **mDNS / Bonjour**: il telefono trova il Master come `rpg-tracker.local`, niente IP da digitare
+- ✅ **QR code**: dal Master, inquadra col telefono per connetterti in un tap
+- ✅ **OneDrive Personal**: carica le immagini di stanze/nemici/alleati in cloud, ritrovi tutto se cambi PC
+
+### Mobile / PWA
+- ✅ APK Android (Capacitor) con auto-discovery del server
+- ✅ PWA installabile su iPhone (Safari) — niente App Store, niente account Apple
+- ✅ Auto-reconnection robusta con backoff esponenziale
 
 ## Installazione
 
@@ -87,11 +99,37 @@ Dopo il build, l'eseguibile e i file di deploy sono in:
 
 ```
 rpg-initiative-tracker/
-├── electron/          # Codice Electron (main process)
-├── public/            # Frontend (HTML, CSS, JS)
-├── data/              # Libreria Pathfinder 1E (JSON)
-└── server.js          # Server standalone (per sviluppo)
+├── src/
+│   ├── server/         # Factory server unificata (HTTP, Socket.IO, config, paths, mDNS)
+│   └── cloud/          # Integrazione OneDrive (Microsoft Graph)
+├── electron/           # Solo BrowserWindow + IPC + lifecycle (~140 righe)
+├── public/             # Frontend (HTML, CSS, JS vanilla)
+│   ├── index.html      # Vista giocatore (PWA installabile)
+│   ├── master.html     # Vista master (Electron)
+│   ├── tablet.html     # Vista display tavolo
+│   ├── config.html     # Configurazione (eroi/nemici/alleati/evocazioni/cloud)
+│   └── ui-enhancements.* # Toast connessione, snackbar, animazioni turno
+├── data/               # Libreria Pathfinder 1E (JSON)
+├── app-data/           # Dati persistenti (DB, config, immagini, token cloud) - gitignored
+└── server.js           # Thin wrapper per server headless (deploy/CLI)
 ```
+
+## OneDrive (opzionale)
+
+Nella tab `☁️ Cloud` della Configurazione puoi:
+1. **Setup una-tantum**: registra una "App registration" gratuita su Azure (5 click) e incolla qui il client ID
+2. **Connetti**: ti viene mostrato un codice da inserire su `microsoft.com/devicelogin` (anche dal telefono va bene)
+3. **Push**: carica tutte le immagini locali su OneDrive (cartella `Apps/RPG Initiative Tracker/`)
+4. **Sync**: scarica da OneDrive le immagini mancanti localmente (utile su un nuovo PC)
+5. Da quel momento, **ogni nuovo upload** di immagine va automaticamente anche su OneDrive (best-effort, non blocca il salvataggio locale)
+
+> **Importante**: il database SQLite e `config.json` restano locali, mai su OneDrive (il sync di SQLite WAL può corromperlo). Solo le immagini vanno in cloud.
+
+## Discovery sulla rete locale
+
+- Sul Master appare il QR code: il giocatore lo inquadra col telefono e si connette istantaneamente.
+- Su iPhone/iPad e Mac, e su molti Android, funziona anche `http://rpg-tracker.local:3001/` direttamente nel browser, senza conoscere l'IP.
+- La vista Giocatore ha il pulsante **🔍 Trova automaticamente** che prova `rpg-tracker.local`, gli IP `.1` e `.254` della tua subnet.
 
 ## Dati e Immagini
 
