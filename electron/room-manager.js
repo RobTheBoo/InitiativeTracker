@@ -1,4 +1,4 @@
-const { generateId, calculateTurnOrder, findInitiativeTies, assignTiebreakers, decrementEffects } = require('./game-logic');
+const { generateId, calculateTurnOrder, findInitiativeTies, assignTiebreakers, reorderTieGroup, decrementEffects } = require('./game-logic');
 const path = require('path');
 const fs = require('fs');
 
@@ -293,6 +293,11 @@ class RoomManager {
     // Tiebreaker decimale: il master modifica manualmente l'ordine fra
     // personaggi con stessa iniziativa (sostituisce il modal).
     socket.on('setInitiativeTiebreaker', (data) => this.handleSetInitiativeTiebreaker(socket, data));
+
+    // Drag & drop nella initiative bar: il master riordina visualmente i char
+    // di uno stesso gruppo intero (es. tutti quelli a init 12) e i decimali
+    // .1/.2/.3 si auto-popolano dalla posizione visiva top-to-bottom.
+    socket.on('reorderTieGroup', (data) => this.handleReorderTieGroup(socket, data));
   }
 
   // Handler individuali (implementazione completa dal server.js)
@@ -451,6 +456,12 @@ class RoomManager {
     };
     gs.enemies.push(enemy);
 
+    // FIX bug "decimale non parte al primo inserimento": se il nuovo nemico
+    // condivide l'iniziativa intera con un altro PG, va assegnato subito
+    // il tiebreaker (.1/.2/...). Senza questa chiamata bisogna modificare
+    // a mano un altro campo per far ripartire il calcolo.
+    assignTiebreakers(gs);
+
     if (gs.combatStarted) {
       gs.turnOrder = calculateTurnOrder(gs);
     }
@@ -555,6 +566,8 @@ class RoomManager {
     console.log('➕ Aggiungo alleato:', ally);
     gs.allies.push(ally);
     console.log('📋 Allies dopo aggiunta:', gs.allies.length, gs.allies);
+
+    assignTiebreakers(gs);
 
     if (gs.combatStarted) {
       gs.turnOrder = calculateTurnOrder(gs);
@@ -742,6 +755,10 @@ class RoomManager {
 
     gs.summons.push(summon);
 
+    if (summon.initiative !== null) {
+      assignTiebreakers(gs);
+    }
+
     if (gs.combatStarted && summon.initiative !== null) {
       gs.turnOrder = calculateTurnOrder(gs);
     }
@@ -805,6 +822,21 @@ class RoomManager {
       this.broadcastAndSave(socket.roomId);
       this.io.to(socket.roomId).emit('combatStarted');
     }
+  }
+
+  // DnD master: orderedIds = id dei char dello stesso gruppo intero, in ordine
+  // visivo top-to-bottom. Riassegna i tie 1..N (tie 1 = primo a giocare) e
+  // ricalcola il turnOrder se in combattimento.
+  handleReorderTieGroup(socket, { integer, orderedIds }) {
+    const gs = this.getGameState(socket);
+    if (!gs || socket.id !== gs.masterId) return;
+    if (!Array.isArray(orderedIds) || orderedIds.length === 0) return;
+    const baseInt = Number(integer);
+    if (!Number.isFinite(baseInt)) return;
+
+    const changed = reorderTieGroup(gs, baseInt, orderedIds);
+    if (gs.combatStarted) gs.turnOrder = calculateTurnOrder(gs);
+    if (changed > 0 || gs.combatStarted) this.broadcastAndSave(socket.roomId);
   }
 
   handleSetInitiativeTiebreaker(socket, { charId, tiebreaker }) {

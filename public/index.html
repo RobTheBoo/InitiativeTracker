@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="ui-enhancements.css">
   <link rel="stylesheet" href="responsive.css">
   <link rel="stylesheet" href="theme-light.css">
-  <link rel="stylesheet" href="premium-ui.css">
+  <link rel="stylesheet" href="premium-ui.css?v=5">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Text:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script defer src="theme-toggle.js"></script>
   <script>
@@ -63,7 +63,34 @@
     <!-- Schermata selezione stanza -->
     <section id="room-selection" class="screen active">
       <h2>Seleziona una Stanza</h2>
-      
+
+      <!-- Banner Connect-Helper: IP + QR per onboarding rapido del telefono.
+           Visibile solo finche' l'utente non entra in una stanza (perche' e' dentro
+           #room-selection, le altre .screen lo nascondono automaticamente). -->
+      <div id="connect-helper-banner" style="display:none; background: linear-gradient(180deg, rgba(212,175,55,0.10), rgba(212,175,55,0.04)); border: 1px solid rgba(212,175,55,0.35); border-radius: 14px; padding: 18px 20px; margin: 0 auto 20px; max-width: 720px; box-shadow: 0 8px 24px rgba(0,0,0,0.25);">
+        <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: center;">
+          <div style="flex: 1 1 240px; min-width: 240px; text-align: center;">
+            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase;">📡 I giocatori si connettono a</div>
+            <button type="button" id="connect-ip-display" title="Tocca per copiare"
+                    style="background: rgba(0,0,0,0.35); border: 1px solid rgba(212,175,55,0.4); border-radius: 10px; color: var(--accent-gold, #d4af37); font-family: 'Courier New', monospace; font-size: 1.25rem; font-weight: 700; padding: 10px 14px; cursor: pointer; width: 100%; max-width: 320px; touch-action: manipulation; word-break: break-all;">
+              http://localhost:3001
+            </button>
+            <div id="connect-ip-copied" style="font-size: 0.8rem; color: #51cf66; margin-top: 6px; min-height: 18px;"></div>
+            <div id="connect-ip-alt" style="margin-top: 4px; font-size: 0.78rem; color: var(--text-dim); font-family: 'Courier New', monospace;"></div>
+            <div style="margin-top: 8px; font-size: 0.78rem; color: var(--text-dim);">
+              Tocca per copiare. Su Android <code style="color: var(--accent-gold);">.local</code> potrebbe non risolvere — usa l'IP.
+            </div>
+          </div>
+          <div style="flex: 0 0 auto; text-align: center;">
+            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; letter-spacing: 0.5px; text-transform: uppercase;">📷 Inquadra col telefono</div>
+            <div style="background: var(--accent-gold, #d4af37); padding: 8px; border-radius: 12px; display: inline-block; line-height: 0;">
+              <img id="connect-qr-img" alt="QR per connettere il telefono" style="display: block; width: 160px; height: 160px; border-radius: 6px; background: #fff;" />
+            </div>
+            <div id="connect-qr-error" style="display:none; color: #ff6b6b; font-size: 0.78rem; margin-top: 6px;"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Campo IP Server - SEMPRE VISIBILE su mobile -->
       <div id="server-ip-section" style="background: var(--card-bg); padding: 20px; border-radius: 12px; margin-bottom: 30px; max-width: 500px; margin-left: auto; margin-right: auto;">
         <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px;">
@@ -344,9 +371,93 @@
 
   <!-- Socket.IO: locale per funzionare in APK/WebView senza dipendere dal CDN -->
   <script src="socket.io.min.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=5"></script>
   <script src="ui-enhancements.js"></script>
   <script>
+    // Connect-helper banner: mostra IP+QR del server di onboarding telefoni.
+    // Standalone (non dipende da app.js) per resilienza nelle WebView.
+    (function () {
+      var banner = document.getElementById('connect-helper-banner');
+      if (!banner) return;
+
+      var ipBtn   = document.getElementById('connect-ip-display');
+      var ipAlt   = document.getElementById('connect-ip-alt');
+      var copied  = document.getElementById('connect-ip-copied');
+      var qrImg   = document.getElementById('connect-qr-img');
+      var qrErr   = document.getElementById('connect-qr-error');
+
+      function applyUrl(primaryUrl, altIps) {
+        if (ipBtn) ipBtn.textContent = primaryUrl;
+        if (qrImg) {
+          qrImg.onerror = function () {
+            if (qrErr) {
+              qrErr.style.display = 'block';
+              qrErr.textContent = 'QR non disponibile (verifica /api/qr).';
+            }
+          };
+          qrImg.src = '/api/qr?url=' + encodeURIComponent(primaryUrl) + '&size=320&_=' + Date.now();
+        }
+        if (ipAlt && Array.isArray(altIps) && altIps.length > 0) {
+          ipAlt.textContent = 'altri IP: ' + altIps.join('  ·  ');
+        }
+        banner.style.display = '';
+      }
+
+      // Click sull'IP -> copia negli appunti (con fallback per WebView vecchie)
+      if (ipBtn) {
+        ipBtn.addEventListener('click', function () {
+          var txt = ipBtn.textContent.trim();
+          var done = function () {
+            if (!copied) return;
+            copied.textContent = '✔ Copiato negli appunti';
+            setTimeout(function () { copied.textContent = ''; }, 1800);
+          };
+          try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(txt).then(done).catch(legacyCopy);
+            } else { legacyCopy(); }
+          } catch (_) { legacyCopy(); }
+          function legacyCopy() {
+            var ta = document.createElement('textarea');
+            ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); done(); } catch (_) {}
+            document.body.removeChild(ta);
+          }
+        });
+      }
+
+      function loadInfo() {
+        var ctrl = ('AbortController' in window) ? new AbortController() : null;
+        var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, 4000) : null;
+        fetch('/api/server-info', ctrl ? { signal: ctrl.signal } : {})
+          .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+          .then(function (info) {
+            if (timer) clearTimeout(timer);
+            var primaryUrl = info.playerUrl || ('http://' + info.primaryIp + ':' + info.port + '/');
+            // info.ips e' [{name, address, score}, ...]: estrai address e scarta il primario
+            var alt = (info.ips || [])
+              .map(function (it) { return (it && typeof it === 'object') ? it.address : it; })
+              .filter(function (ip) { return ip && ip !== info.primaryIp; });
+            applyUrl(primaryUrl, alt);
+          })
+          .catch(function () {
+            if (timer) clearTimeout(timer);
+            // Fallback: usa l'origin corrente (funziona quando l'utente apre gia' /)
+            var origin = window.location.origin;
+            // Se siamo in file:// o capacitor:// (APK senza server raggiungibile), nascondi.
+            if (!/^https?:/i.test(origin)) { banner.style.display = 'none'; return; }
+            applyUrl(origin + '/', []);
+          });
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadInfo);
+      } else {
+        loadInfo();
+      }
+    })();
+
     // Registrazione Service Worker per PWA solo in browser (non in app Capacitor/Electron)
     var isNative = (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) || (window.electronAPI && window.electronAPI.isElectron);
     if (!isNative && 'serviceWorker' in navigator) {

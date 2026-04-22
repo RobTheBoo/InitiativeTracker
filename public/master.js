@@ -308,23 +308,20 @@ function renderHeroesList() {
   
 }
 
-// Renderizza i due campi (init + tiebreaker decimale) per qualunque char.
-// - init-input: intero, modificabile sempre
-// - tie-input: 1..9, ABILITATO solo se il char condivide initiative con altri.
-//   Quando ci sono ties il backend auto-assegna 1,2,3 ma il master puo' editare.
+// Renderizza il campo iniziativa per qualunque char.
+// - init-input: intero, modificabile sempre.
+// - In caso di pareggio (.1, .2, ...) il decimale appare come BADGE accanto
+//   ed e' gestito via drag-and-drop nella initiative bar (non piu' via input).
 function renderInitiativeFields(char, setterFnName) {
   const initVal = char.initiative !== null && char.initiative !== undefined ? Math.floor(char.initiative) : '';
   const tieVal = (char.initiativeTie != null && char.initiativeTie !== '') ? char.initiativeTie : '';
-  const hasTie = tieVal !== '';
-  const tieDisabled = !hasTie ? 'disabled' : '';
+  const tieBadge = tieVal !== ''
+    ? `<span class="tie-badge" title="Ordine in pari iniziativa - trascina nella barra per cambiarlo">.${tieVal}</span>`
+    : '';
   return `
     <input type="number" class="init-input" value="${initVal}"
            placeholder="Init" min="0" onchange="${setterFnName}('${char.id}', this.value)">
-    <input type="number" class="tie-input ${hasTie ? 'active' : 'inactive'}"
-           value="${tieVal}" placeholder="·" min="1" max="9" step="1"
-           title="${hasTie ? 'Ordine in pari iniziativa (1-9) - modificabile dal master' : 'Si attiva solo se due personaggi hanno la stessa iniziativa'}"
-           ${tieDisabled}
-           onchange="setCharTiebreaker('${char.id}', this.value)">
+    ${tieBadge}
   `;
 }
 
@@ -512,23 +509,105 @@ function renderInitiativeBar() {
   const bar = document.getElementById('initiative-bar');
   if (!bar) return;
   
+  // Conta quanti char ci sono per ogni gruppo intero (per sapere chi e' "in tie")
+  const groupSize = new Map();
+  for (const c of gameState.turnOrder) {
+    const k = Math.floor(Number(c.initiative));
+    groupSize.set(k, (groupSize.get(k) || 0) + 1);
+  }
+
   bar.innerHTML = gameState.turnOrder.map((char, index) => {
     const isActive = index === gameState.currentTurn;
     const charClass = char.isEnemy ? 'enemy' : (char.isAlly ? 'ally' : (char.isSummon ? 'summon' : 'hero'));
     const summonInfo = char.isSummon ? ` <span style="font-size: 0.7rem; color: var(--text-muted);">(${char.remainingRounds}rnd)</span>` : '';
-    
+
     // Mostra l'iniziativa col tiebreaker decimale (es. 12.1) se presente, cosi'
     // il master vede subito quale char "vince" il pari.
     const initBase = Math.floor(Number(char.initiative));
     const tie = (char.initiativeTie != null && char.initiativeTie !== '') ? `.${char.initiativeTie}` : '';
+
+    // Una card e' "draggable" SOLO se il suo gruppo ha 2+ char (in pari).
+    // Per gli altri il drag non avrebbe senso (cambierebbe solo l'integer init,
+    // che si modifica con l'apposito input nella lista personaggi).
+    const inTie = groupSize.get(initBase) > 1;
+    const dragAttrs = inTie
+      ? `draggable="true" data-char-id="${char.id}" data-int="${initBase}" class="turn-card draggable ${isActive ? 'active' : ''} ${charClass}"`
+      : `class="turn-card ${isActive ? 'active' : ''} ${charClass}"`;
+
     return `
-      <div class="turn-card ${isActive ? 'active' : ''} ${charClass}">
+      <div ${dragAttrs} title="${inTie ? 'Trascina per riordinare il pareggio iniziativa' : ''}">
         <div class="portrait">${renderPortrait(char, 'small')}</div>
         <div class="name">${char.name}${summonInfo}</div>
         <div class="init-badge">${initBase}${tie}</div>
       </div>
     `;
   }).join('');
+
+  attachInitiativeBarDnD(bar);
+}
+
+// === Drag & Drop nella initiative bar ===
+// Vincoli: il master puo' trascinare SOLO all'interno dello stesso "gruppo intero"
+// (es. tutti i char a init 12). Non ha senso muovere un init=12 sopra un init=15:
+// l'integer non cambia, e lo dico al master via UI (drop zone illuminata solo
+// dentro il gruppo valido).
+let dragState = null;
+function attachInitiativeBarDnD(bar) {
+  const cards = Array.from(bar.querySelectorAll('.turn-card.draggable'));
+  cards.forEach(card => {
+    card.addEventListener('dragstart', (e) => {
+      dragState = {
+        id: card.dataset.charId,
+        integer: parseInt(card.dataset.int, 10),
+        sourceEl: card
+      };
+      card.classList.add('dragging');
+      // Firefox richiede setData per attivare il drag
+      try { e.dataTransfer.setData('text/plain', card.dataset.charId); } catch (_) {}
+      e.dataTransfer.effectAllowed = 'move';
+      // Evidenzia gli "slot validi" = card dello stesso gruppo
+      bar.querySelectorAll(`.turn-card.draggable[data-int="${dragState.integer}"]`)
+         .forEach(c => c.classList.add('valid-target'));
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      bar.querySelectorAll('.turn-card').forEach(c => {
+        c.classList.remove('valid-target', 'drop-before', 'drop-after');
+      });
+      dragState = null;
+    });
+    card.addEventListener('dragover', (e) => {
+      if (!dragState) return;
+      const targetInt = parseInt(card.dataset.int, 10);
+      if (targetInt !== dragState.integer) return; // NON un drop valido
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const rect = card.getBoundingClientRect();
+      const before = (e.clientX - rect.left) < rect.width / 2;
+      card.classList.toggle('drop-before', before);
+      card.classList.toggle('drop-after', !before);
+    });
+    card.addEventListener('dragleave', () => {
+      card.classList.remove('drop-before', 'drop-after');
+    });
+    card.addEventListener('drop', (e) => {
+      if (!dragState) return;
+      const targetInt = parseInt(card.dataset.int, 10);
+      if (targetInt !== dragState.integer) return;
+      e.preventDefault();
+      const rect = card.getBoundingClientRect();
+      const before = (e.clientX - rect.left) < rect.width / 2;
+      const targetId = card.dataset.charId;
+      if (targetId === dragState.id) return; // dropped on itself
+      // Costruisci il nuovo ordine del gruppo basandoti sul DOM corrente
+      const groupCards = Array.from(bar.querySelectorAll(`.turn-card.draggable[data-int="${dragState.integer}"]`));
+      const ids = groupCards.map(c => c.dataset.charId).filter(id => id !== dragState.id);
+      const targetIdx = ids.indexOf(targetId);
+      const insertAt = before ? targetIdx : targetIdx + 1;
+      ids.splice(insertAt, 0, dragState.id);
+      socket.emit('reorderTieGroup', { integer: dragState.integer, orderedIds: ids });
+    });
+  });
 }
 
 // Aggiorna UI

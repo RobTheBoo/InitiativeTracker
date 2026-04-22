@@ -134,13 +134,15 @@ function renderInitiativeBar() {
     const charClass = char.isEnemy ? 'enemy' : (char.isAlly ? 'ally' : (char.isSummon ? 'summon' : 'hero'));
     const isPast = index < gameState.currentTurn;
     
+    const initBase = Math.floor(Number(char.initiative));
+    const tieSuffix = (char.initiativeTie != null && char.initiativeTie !== '') ? `.${char.initiativeTie}` : '';
     return `
       <div class="tablet-turn-card ${isActive ? 'active' : ''} \ ${isPast ? 'past' : ''}">
         <div class="tablet-token">
           <div class="tablet-portrait ${isActive ? 'pulse' : ''}">${renderPortrait(char, 'large')}</div>
         </div>
         <div class="tablet-name">${char.name}${char.isSummon ? ` <span style="font-size: 0.7rem; color: var(--text-muted);">(${char.remainingRounds}rnd)</span>` : ''}</div>
-        <div class="tablet-init">${Math.floor(char.initiative)}</div>
+        <div class="tablet-init">${initBase}${tieSuffix}</div>
       </div>
     `;
   }).join('');
@@ -367,9 +369,10 @@ function generateQRCode(url) {
   const qrContainer = document.getElementById('qr-code');
   if (!qrContainer) return;
   
-  // Usa un servizio online per generare il QR code
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(url)}`;
-  qrContainer.innerHTML = `<img src="${qrUrl}" alt="QR Code" style="width: 100%; height: auto; border-radius: 8px;">`;
+  // Usa l'endpoint locale /api/qr per funzionare anche offline (rete LAN del DM).
+  // Cache-buster cosi' un cambio di IP del server aggiorna subito il QR.
+  const qrUrl = `/api/qr?url=${encodeURIComponent(url)}&size=320&_=${Date.now()}`;
+  qrContainer.innerHTML = `<img src="${qrUrl}" alt="QR Code" style="width: 100%; height: auto; border-radius: 8px; background: #fff;">`;
   document.getElementById('qr-code-container').style.display = 'block';
 }
 

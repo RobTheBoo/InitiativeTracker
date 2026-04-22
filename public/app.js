@@ -811,11 +811,13 @@ function renderCombatScreen() {
     const isAlly = char.isAlly;
     const summonInfo = char.isSummon ? ` <span style="font-size: 0.7rem; color: var(--text-muted);">(${char.remainingRounds}rnd)</span>` : '';
     
+    const initBase = Math.floor(Number(char.initiative));
+    const tieSuffix = (char.initiativeTie != null && char.initiativeTie !== '') ? `.${char.initiativeTie}` : '';
     return `
       <div class="turn-card ${isActive ? 'active' : ''} ${isMeInBar || isMySummonInBar ? 'mine' : ''} ${isEnemy ? 'enemy' : ''} ${isAlly ? 'ally' : ''} ${char.isSummon ? 'summon' : ''}">
         <div class="portrait">${renderPortrait(char, 'small')}</div>
         <div class="name">${char.name}${summonInfo}</div>
-        <div class="init-badge">${Math.floor(char.initiative)}</div>
+        <div class="init-badge">${initBase}${tieSuffix}</div>
         ${char.effects && char.effects.length > 0 ? 
           `<div class="effects-count">${char.effects.length} effetti</div>` : ''}
       </div>

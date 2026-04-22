@@ -6,14 +6,22 @@ function generateId() {
   return crypto.randomBytes(8).toString('hex');
 }
 
-// Valore effettivo di iniziativa per il sort: initiative (intero) + tiebreaker/10.
-// Esempio: init=12, tie=2 -> 12.2 ; init=12, tie=null -> 12.0
-function effectiveInitiative(char) {
+// Valore "intero" base di iniziativa, usato per il primo livello di sort.
+// Il tiebreaker e' un secondo livello separato (vedi calculateTurnOrder).
+function baseInitiative(char) {
   const base = Number(char.initiative);
   if (Number.isNaN(base)) return 0;
+  return Math.floor(base);
+}
+
+// Valore effettivo continuo: usato solo per UI/etichette (es. "12.2"), NON per sort.
+// Convenzione UX: tie 1 = primo a giocare nel gruppo, tie 9 = ultimo.
+// Math: base - tie/10 (cosi' 12.1 > 12.2 > 12.9 in valore numerico).
+function effectiveInitiative(char) {
+  const base = baseInitiative(char);
   const tie = Number(char.initiativeTie);
   if (!Number.isFinite(tie) || tie <= 0) return base;
-  return base + (tie / 10);
+  return base - (tie / 10);
 }
 
 function calculateTurnOrder(gameState) {
@@ -24,13 +32,62 @@ function calculateTurnOrder(gameState) {
     ...(gameState.summons || []).filter(s => s.initiative !== null)
   ];
   return allChars.sort((a, b) => {
-    const diff = effectiveInitiative(b) - effectiveInitiative(a);
-    if (diff !== 0) return diff;
+    // Primario: integer iniziativa decrescente (15 prima di 12).
+    const baseDiff = baseInitiative(b) - baseInitiative(a);
+    if (baseDiff !== 0) return baseDiff;
+    // Secondario: tiebreaker crescente, .1 PRIMA di .2 PRIMA di .9.
+    // Null/0 = "non assegnato" -> in coda al gruppo (peso 99).
+    const aTie = (Number.isInteger(a.initiativeTie) && a.initiativeTie > 0) ? a.initiativeTie : 99;
+    const bTie = (Number.isInteger(b.initiativeTie) && b.initiativeTie > 0) ? b.initiativeTie : 99;
+    if (aTie !== bTie) return aTie - bTie;
     // Fallback legacy: initiativeOrder esplicito (compat con vecchi save)
     const aOrder = a.initiativeOrder != null ? a.initiativeOrder : 999;
     const bOrder = b.initiativeOrder != null ? b.initiativeOrder : 999;
     return aOrder - bOrder;
   });
+}
+
+// Riassegna i tiebreakers di UN solo gruppo intero in base all'ordine fornito.
+// Usato dall'evento DnD del master: orderedIds = ordine visivo top-to-bottom.
+// Ritorna il numero di char modificati.
+function reorderTieGroup(gameState, integerInitiative, orderedIds) {
+  const target = Math.floor(Number(integerInitiative));
+  if (!Number.isFinite(target)) return 0;
+  const allChars = [
+    ...gameState.heroes,
+    ...gameState.enemies,
+    ...gameState.allies,
+    ...(gameState.summons || [])
+  ];
+  // Indice rapido: id -> char (solo char con base == target)
+  const groupMap = new Map();
+  for (const c of allChars) {
+    if (c.initiative === null || c.initiative === undefined) continue;
+    if (Math.floor(Number(c.initiative)) === target) groupMap.set(c.id, c);
+  }
+  let changed = 0;
+  let slot = 1;
+  for (const id of orderedIds) {
+    const c = groupMap.get(id);
+    if (!c) continue;
+    if (slot > 9) break;
+    if (c.initiativeTie !== slot) {
+      c.initiativeTie = slot;
+      changed++;
+    }
+    groupMap.delete(id);
+    slot++;
+  }
+  // Eventuali char del gruppo non citati nel nuovo ordine: mettili in coda.
+  for (const c of groupMap.values()) {
+    if (slot > 9) break;
+    if (c.initiativeTie !== slot) {
+      c.initiativeTie = slot;
+      changed++;
+    }
+    slot++;
+  }
+  return changed;
 }
 
 // Assegna automaticamente i tiebreakers (.1, .2, .3 ...) ai personaggi che
@@ -124,7 +181,9 @@ module.exports = {
   calculateTurnOrder,
   findInitiativeTies,
   assignTiebreakers,
+  reorderTieGroup,
   effectiveInitiative,
+  baseInitiative,
   decrementEffects
 };
 

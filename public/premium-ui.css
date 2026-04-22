@@ -268,6 +268,57 @@ button.btn {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.40), inset 0 1px 0 rgba(255, 255, 255, 0.30);
 }
 
+/* === Drag & drop initiative bar (master only) ========================== */
+/* Le card "draggable" sono quelle in pareggio iniziativa: il master puo'
+   trascinarle per riordinarle. Le altre restano statiche. */
+.turn-card.draggable {
+  cursor: grab;
+}
+.turn-card.draggable:active {
+  cursor: grabbing;
+}
+.turn-card.draggable::before {
+  content: "⋮⋮";
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--accent-gold, #d4af37);
+  opacity: 0.55;
+  pointer-events: none;
+  letter-spacing: -2px;
+}
+.turn-card.dragging {
+  opacity: 0.45;
+  transform: scale(0.96);
+}
+.turn-card.valid-target:not(.dragging) {
+  outline: 1px dashed rgba(212, 175, 55, 0.55);
+  outline-offset: 2px;
+}
+.turn-card.drop-before {
+  box-shadow: -4px 0 0 0 var(--accent-gold, #d4af37);
+}
+.turn-card.drop-after {
+  box-shadow: 4px 0 0 0 var(--accent-gold, #d4af37);
+}
+
+/* Badge .1/.2 accanto all'input iniziativa nelle liste personaggi */
+.tie-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: var(--r-pill, 999px);
+  background: linear-gradient(180deg, #ffe590 0%, #c89a3e 100%);
+  color: #1a1208;
+  font-family: 'Cinzel', serif;
+  font-weight: 800;
+  font-size: 0.78rem;
+  vertical-align: middle;
+  cursor: help;
+}
+
 /* === Inputs polish ===================================================== */
 input[type="text"], input[type="number"], input[type="email"],
 input[type="search"], select, textarea {
