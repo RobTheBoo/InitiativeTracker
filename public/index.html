@@ -12,9 +12,15 @@
   <meta name="apple-mobile-web-app-title" content="RPG Tracker">
   <link rel="apple-touch-icon" href="/icon.png">
   <link rel="apple-touch-startup-image" href="/icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="design-tokens.css">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="ui-enhancements.css">
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="responsive.css">
+  <link rel="stylesheet" href="theme-light.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script defer src="theme-toggle.js"></script>
   <script>
     // Definisci connectToServerHandler immediatamente come stub
     // Questa sarà sovrascritta da app.js quando viene caricato
@@ -40,6 +46,7 @@
   </script>
 </head>
 <body class="player-view">
+  <div class="rpg-theme-toggle-slot" data-theme-toggle-into></div>
   <div class="container">
     <header>
       <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -226,16 +233,16 @@
       </div>
 
       <!-- Effetti in combattimento -->
-      <div class="combat-effects" style="display: flex; gap: 20px; align-items: flex-start;">
+      <div class="combat-effects">
         <!-- Solo evocazioni in formato compatto (nascosto se non ci sono evocazioni) -->
-        <div class="entity-selector" id="entity-selector-wrap" style="flex-shrink: 0;">
+        <div class="entity-selector" id="entity-selector-wrap">
           <div id="entity-cards" class="entity-cards-compact">
             <!-- Generato da JavaScript: solo evocazioni + chip "Tu" se necessario -->
           </div>
         </div>
         
         <!-- Blocco effetti per l'entità selezionata -->
-        <div class="my-combat-effects" style="flex: 1;">
+        <div class="my-combat-effects">
           <h4 id="selected-entity-title">🔮 I Tuoi Effetti</h4>
           <div id="combat-my-effects" class="effects-list compact">
             <!-- Generato da JavaScript -->
@@ -255,7 +262,7 @@
           </div>
         </div>
         
-        <div class="area-combat-effects" style="min-width: 250px; flex-shrink: 0;">
+        <div class="area-combat-effects">
           <h4>🌍 Effetti ad Area</h4>
           <div id="combat-area-effects" class="effects-list compact area">
             <!-- Generato da JavaScript -->

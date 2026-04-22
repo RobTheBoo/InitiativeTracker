@@ -4,11 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
   <title>🎭 Initiative Tracker - Master</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="design-tokens.css">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="ui-enhancements.css">
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="responsive.css">
+  <link rel="stylesheet" href="theme-light.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script defer src="theme-toggle.js"></script>
 </head>
 <body class="master-view">
+  <div class="rpg-theme-toggle-slot" data-theme-toggle-into></div>
   <div class="container wide">
     <header>
       <div>
@@ -26,10 +33,20 @@
         </div>
       </div>
 
+      <!-- Nav mobile: visibile solo sotto 768px (vedi responsive.css).
+           Permette al master di saltare rapidamente alle sezioni quando il
+           layout è impilato verticalmente. -->
+      <nav class="master-mobile-tabs" aria-label="Sezioni master">
+        <a href="#heroes-section"   class="master-mobile-tab">⚔️ Eroi</a>
+        <a href="#controls-section" class="master-mobile-tab">🎛️ Controlli</a>
+        <a href="#enemies-section"  class="master-mobile-tab">👹 Nemici</a>
+        <a href="#allies-section"   class="master-mobile-tab">🛡️ NPC</a>
+      </nav>
+
       <div class="master-layout">
         
         <!-- Colonna sinistra: Eroi -->
-        <div class="column heroes-column">
+        <div id="heroes-section" class="column heroes-column">
           <h2>⚔️ Eroi</h2>
           <div id="heroes-list" class="characters-list">
             <!-- Generato da JavaScript -->
@@ -37,7 +54,7 @@
         </div>
 
         <!-- Colonna centrale: Controlli -->
-        <div class="column controls-column">
+        <div id="controls-section" class="column controls-column">
           <div class="round-display">
             <span class="round-label">Round</span>
             <span id="round-number" class="round-number large">1</span>
@@ -86,7 +103,7 @@
         </div>
 
         <!-- Colonna destra: Nemici -->
-        <div class="column enemies-column">
+        <div id="enemies-section" class="column enemies-column">
           <h2>👹 Nemici</h2>
           <div id="enemies-list" class="characters-list">
             <!-- Generato da JavaScript -->
@@ -103,7 +120,7 @@
       </div>
 
       <!-- Alleati NPC sempre sotto, a tutta larghezza -->
-      <div class="master-allies-section">
+      <div id="allies-section" class="master-allies-section">
         <h2 class="allies-section-title">🛡️ Alleati NPC</h2>
         <div class="master-allies-row">
           <div id="allies-list" class="characters-list allies-list-inline">

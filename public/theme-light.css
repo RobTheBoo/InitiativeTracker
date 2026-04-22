@@ -1,0 +1,77 @@
+/* ============================================================================
+   THEME LIGHT - RPG Initiative Tracker
+   ============================================================================
+   Attivato da:  <html data-theme="light">  (toggle utente)
+            o:  prefers-color-scheme: light  (sistema, solo se utente non ha scelto)
+
+   Logica di attivazione (Fase 5):
+   - All'avvio JS legge localStorage 'rpg-theme': 'dark' | 'light' | null.
+   - Se null, usa prefers-color-scheme.
+   - Setta <html data-theme="…">.
+
+   Caricato DOPO style.css per sovrascrivere i token dark.
+   Nota: NON tocca le palette accent (gold, red, green, blue, purple) perché
+   sono identità visiva del prodotto. Cambia solo sfondi, testo e contrasti.
+   ========================================================================= */
+
+[data-theme="light"] {
+  --bg-dark:   #f4f1ea;
+  --bg-medium: #e8e2d3;
+  --bg-light:  #faf7ee;
+  --bg-card:   #ffffff;
+
+  --text-light: #1f1d18;
+  --text-dim:   #5b5750;
+  --text:       #1f1d18;
+  --text-muted: #6b6b78;
+  --text-on-accent: #1a1a2e;
+
+  --border-gold: #b8964c;
+  --glow-gold:  rgba(184, 150, 76, 0.20);
+  --glow-green: rgba(60, 130, 110, 0.25);
+  --glow-red:   rgba(180, 60, 60, 0.25);
+
+  /* Accent: leggermente desaturati per il bianco */
+  --accent-gold:   #b08540;
+  --accent-red:    #b04848;
+  --accent-green:  #4a8a82;
+  --accent-blue:   #4a7da6;
+  --accent-purple: #8a6e9a;
+
+  --hero-color:  #3c7a7c;
+  --enemy-color: #a14a4a;
+
+  /* Shadow: meno aggressive su sfondo chiaro */
+  --sh-1: 0 1px 2px rgba(40,30,20,0.10);
+  --sh-2: 0 2px 6px rgba(40,30,20,0.12), 0 1px 2px rgba(40,30,20,0.08);
+  --sh-3: 0 4px 12px rgba(40,30,20,0.16), 0 2px 4px rgba(40,30,20,0.10);
+  --sh-4: 0 8px 24px rgba(40,30,20,0.22), 0 4px 8px rgba(40,30,20,0.12);
+}
+
+/* Auto-light se l'utente non ha mai espresso preferenza E il SO è light.
+   La presenza di [data-theme="dark"] (settato esplicitamente da JS) blocca
+   questo override. */
+@media (prefers-color-scheme: light) {
+  html:not([data-theme="dark"]):not([data-theme="light"]) {
+    --bg-dark:   #f4f1ea;
+    --bg-medium: #e8e2d3;
+    --bg-light:  #faf7ee;
+    --bg-card:   #ffffff;
+    --text-light: #1f1d18;
+    --text-dim:   #5b5750;
+    --text:       #1f1d18;
+    --text-muted: #6b6b78;
+    --border-gold: #b8964c;
+    --glow-gold:  rgba(184, 150, 76, 0.20);
+  }
+}
+
+/* Adatta gli sfondi gradient di body al tema chiaro */
+[data-theme="light"] body {
+  background: var(--bg-dark);
+  background-image:
+    radial-gradient(ellipse at top, rgba(220, 200, 160, 0.45) 0%, transparent 60%),
+    radial-gradient(ellipse at bottom, rgba(200, 180, 150, 0.40) 0%, transparent 60%);
+}
+
+/* Meta theme-color dinamico è gestito via JS in Fase 5 */

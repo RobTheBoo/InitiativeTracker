@@ -1,0 +1,340 @@
+/* ============================================================================
+   RESPONSIVE - RPG Initiative Tracker
+   ============================================================================
+   Caricato DOPO style.css. Approccio mobile-first con `min-width`.
+
+   Scala unificata:
+     base (mobile)        - regole inline in style.css o qui senza @media
+     sm  (>= 480px)       - smartphone landscape o tablet stretto
+     md  (>= 768px)       - tablet portrait
+     lg  (>= 1024px)      - tablet landscape / piccolo laptop
+     xl  (>= 1280px)      - desktop
+
+   Note:
+   - Le vecchie media query `max-width` in style.css restano per ora (legacy):
+     non danno conflitti perché qui usiamo `min-width` su selettori più
+     specifici o aggiuntivi. In una futura passata vanno consolidate.
+   - Tutte le scelte vanno verificate con test visivo prima di toccare HTML.
+   ========================================================================= */
+
+/* =============================================================
+   ROOM-SELECTOR
+   File: room-selector.html (con stili inline in <style>)
+   ============================================================= */
+
+/* Mobile-first: form crea-stanza in colonna */
+.create-room-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3, 12px);
+}
+.create-room-form input,
+.create-room-form button {
+  width: 100%;
+}
+
+/* Card stanza: minWidth più aggressivo per mobile */
+.rooms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: var(--sp-4, 16px);
+}
+
+@media (min-width: 768px) {
+  .create-room-form {
+    flex-direction: row;
+    align-items: stretch;
+  }
+  .create-room-form input { flex: 1; }
+  .create-room-form button { width: auto; flex-shrink: 0; }
+}
+
+
+/* =============================================================
+   MASTER VIEW
+   - mobile (<768px): stack verticale + tab-bar sticky in alto per scroll
+   - tablet (768-1023): 2 colonne (Eroi | Nemici) con Controlli sopra full-width
+   - desktop (>=1024px): 3 colonne come prima
+   ============================================================= */
+
+/* Mobile: stack a colonna singola e nav sticky per saltare alle sezioni */
+.master-view .master-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5, 20px);
+}
+
+/* Tab bar mobile (iniettata via JS in master.js Fase 4 follow-up; per ora
+   se l'HTML la include si renderizza, altrimenti è invisibile) */
+.master-mobile-tabs {
+  display: flex;
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky, 100);
+  gap: var(--sp-1, 4px);
+  padding: var(--sp-2, 8px) 0;
+  background: var(--bg-dark);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+  margin: 0 calc(-1 * var(--sp-4, 15px));
+  padding-left: var(--sp-4, 15px);
+  padding-right: var(--sp-4, 15px);
+}
+.master-mobile-tabs::-webkit-scrollbar { height: 4px; }
+.master-mobile-tabs::-webkit-scrollbar-thumb { background: var(--border-gold); border-radius: 2px; }
+.master-mobile-tab {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  padding: var(--sp-2, 8px) var(--sp-4, 14px);
+  border-radius: var(--r-pill, 9999px);
+  background: var(--bg-card);
+  color: var(--text-light);
+  border: 1px solid var(--border-gold);
+  font-family: var(--font-display, 'Cinzel', serif);
+  font-size: var(--fs-sm, 0.85rem);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  min-height: var(--touch-min, 44px);
+  display: inline-flex;
+  align-items: center;
+  transition: all var(--duration-fast, 120ms) var(--ease-out, ease);
+}
+.master-mobile-tab:hover,
+.master-mobile-tab:focus-visible {
+  background: var(--accent-gold);
+  color: var(--bg-dark);
+}
+
+@media (min-width: 768px) {
+  /* Nascondi tab mobile su tablet+ */
+  .master-mobile-tabs { display: none; }
+
+  /* 2 colonne con Controlli full-width sopra */
+  .master-view .master-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "controls controls"
+      "heroes   enemies";
+    gap: var(--sp-5, 20px);
+  }
+  .master-view .heroes-column   { grid-area: heroes; }
+  .master-view .enemies-column  { grid-area: enemies; }
+  .master-view .controls-column { grid-area: controls; }
+}
+
+@media (min-width: 1024px) {
+  /* Layout originale a 3 colonne, large screen */
+  .master-view .master-layout {
+    grid-template-columns: 1fr minmax(320px, 360px) 1fr;
+    grid-template-areas: "heroes controls enemies";
+  }
+}
+
+
+/* =============================================================
+   CONFIG VIEW
+   - tabs scrollabili orizzontali su mobile
+   - card-grid 1/2/3 col responsive
+   ============================================================= */
+
+.config-tabs {
+  display: flex;
+  gap: var(--sp-2, 8px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+  padding-bottom: var(--sp-2, 8px);
+  margin: 0 calc(-1 * var(--sp-4, 15px));
+  padding-left: var(--sp-4, 15px);
+  padding-right: var(--sp-4, 15px);
+  -webkit-overflow-scrolling: touch;
+}
+.config-tabs::-webkit-scrollbar { height: 4px; }
+.config-tabs::-webkit-scrollbar-thumb { background: var(--border-gold); border-radius: 2px; }
+.config-tab {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  white-space: nowrap;
+  min-height: var(--touch-min, 44px);
+}
+
+/* Grid delle card di configurazione */
+.characters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: var(--sp-4, 16px);
+}
+
+@media (min-width: 1024px) {
+  .characters-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+}
+
+
+/* =============================================================
+   PLAYER VIEW
+   - mobile-first già buono, miglioriamo landscape e tablet
+   ============================================================= */
+
+/* Su tablet portrait (>=768): leggermente più aria, max-width più ampio */
+@media (min-width: 768px) {
+  body.player-view .container {
+    max-width: 720px;
+  }
+  /* Combat effects su tablet: 2 col (entity + my) con area sotto full */
+  /* (già definito in style.css combat-effects @media min-width:768) */
+}
+
+/* Su laptop landscape: massima leggibilità, container più stretto centrato */
+@media (min-width: 1024px) {
+  body.player-view .container {
+    max-width: 960px;
+  }
+}
+
+
+/* =============================================================
+   TABLET VIEW
+   - Default: pensato landscape (come oggi)
+   - data-orient-mode="responsive" + portrait → layout verticale dedicato
+   - Toggle gestito da JS in Fase 5 (localStorage 'rpg-tablet-mode')
+   ============================================================= */
+
+/* Default: landscape lock visivo - se in portrait mostra hint di rotazione */
+body.tablet-view[data-orient-mode="landscape-lock"] {
+  position: relative;
+}
+@media (orientation: portrait) {
+  body.tablet-view[data-orient-mode="landscape-lock"] .tablet-container {
+    /* Nascondiamo il contenuto e mostriamo overlay rotazione */
+    display: none;
+  }
+  body.tablet-view[data-orient-mode="landscape-lock"]::before {
+    content: "↻  Ruota il dispositivo in orizzontale";
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: var(--bg-dark);
+    color: var(--accent-gold);
+    font-family: var(--font-display, 'Cinzel', serif);
+    font-size: var(--fs-xl, 1.5rem);
+    padding: var(--sp-5, 20px);
+    z-index: var(--z-modal, 1000);
+  }
+}
+
+/* Modalità responsive: portrait riadatta il layout in colonna */
+@media (orientation: portrait) {
+  body.tablet-view[data-orient-mode="responsive"] .tablet-current-turn-card {
+    flex-direction: column;
+    text-align: center;
+  }
+  body.tablet-view[data-orient-mode="responsive"] .tablet-portrait-large {
+    width: min(60vw, 320px);
+    height: min(60vw, 320px);
+    margin: 0 auto;
+  }
+  body.tablet-view[data-orient-mode="responsive"] .tablet-initiative-bar {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+
+/* =============================================================
+   ICON BUTTON (bottoni icona quadrati per toggle tema, settings, ecc.)
+   Stile coerente con `.btn` ma compatto e senza font Cinzel.
+   ============================================================= */
+
+.rpg-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-min, 44px);
+  height: var(--touch-min, 44px);
+  padding: 0;
+  border-radius: var(--r-md, 8px);
+  background: var(--bg-card);
+  color: var(--text-light);
+  border: 1px solid var(--border-gold);
+  cursor: pointer;
+  transition: all var(--duration-fast, 120ms) var(--ease-out, ease);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+.rpg-icon-btn:hover,
+.rpg-icon-btn:focus-visible {
+  background: var(--accent-gold);
+  color: var(--bg-dark);
+  transform: translateY(-1px);
+}
+.rpg-icon-btn:active {
+  transform: translateY(0);
+  filter: brightness(0.95);
+}
+.rpg-icon-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Toggle modalità tablet: floating action button bottom-right */
+.rpg-tablet-mode-toggle-fab {
+  position: fixed;
+  bottom: max(var(--sp-3, 12px), env(safe-area-inset-bottom, 12px));
+  right: max(var(--sp-3, 12px), env(safe-area-inset-right, 12px));
+  z-index: var(--z-sticky, 100);
+  box-shadow: var(--sh-3, 0 4px 12px rgba(0,0,0,0.4));
+  opacity: 0.7;
+}
+.rpg-tablet-mode-toggle-fab:hover { opacity: 1; }
+
+/* Slot per theme toggle: in alto a destra nella viewport, fixed.
+   Slot è un wrapper minimale, il bottone è figlio iniettato da JS.
+   Viene posizionato fuori dal flusso per non spostare il layout esistente. */
+.rpg-theme-toggle-slot {
+  position: fixed;
+  top: max(var(--sp-3, 12px), env(safe-area-inset-top, 12px));
+  right: max(var(--sp-3, 12px), env(safe-area-inset-right, 12px));
+  z-index: var(--z-sticky, 100);
+  display: flex;
+  gap: var(--sp-2, 8px);
+}
+
+
+/* =============================================================
+   UTILITY
+   - .visually-hidden (per screen reader, già esiste in style.css)
+   - .no-scroll (lock body scroll quando modal aperta)
+   ============================================================= */
+
+.no-scroll {
+  overflow: hidden;
+  touch-action: none;
+}
+
+/* Su pointer fine (mouse), permette scrollbar più sottile */
+@media (pointer: fine) {
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-gold);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-gold);
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--bg-card);
+  }
+}

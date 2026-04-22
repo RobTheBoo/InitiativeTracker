@@ -1,0 +1,138 @@
+/* ============================================================================
+   DESIGN TOKENS - RPG Initiative Tracker
+   ============================================================================
+   Caricato PRIMA di style.css. I valori qui sono baseline; style.css può
+   sovrascriverli per il tema dark "RPG" attuale (cascade naturale del CSS).
+
+   Convenzione naming:
+     --sp-N    spacing (N = step della scala)
+     --r-N     border-radius
+     --fs-N    font-size (fluid via clamp)
+     --lh-N    line-height
+     --sh-N    box-shadow
+     --z-N     z-index
+     --bp-N    breakpoints (uso in @media; valori solo in commento)
+     --c-N     colore semantico (testo, sfondo, accento)
+
+   Breakpoint scale (mobile-first, min-width):
+     sm: 480px   (large phone landscape)
+     md: 768px   (tablet portrait)
+     lg: 1024px  (tablet landscape / small laptop)
+     xl: 1280px  (desktop)
+   ========================================================================= */
+
+:root {
+  /* === Spacing scale (4px base) === */
+  --sp-0: 0;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 64px;
+
+  /* === Border-radius === */
+  --r-xs: 2px;
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 20px;
+  --r-pill: 9999px;
+
+  /* === Typography (fluid via clamp(min, preferred, max)) === */
+  --fs-xs:      clamp(0.72rem, 0.68rem + 0.20vw, 0.81rem);
+  --fs-sm:      clamp(0.81rem, 0.77rem + 0.22vw, 0.94rem);
+  --fs-base:    clamp(0.94rem, 0.90rem + 0.25vw, 1.06rem);
+  --fs-md:      clamp(1.06rem, 1.00rem + 0.30vw, 1.19rem);
+  --fs-lg:      clamp(1.19rem, 1.10rem + 0.40vw, 1.38rem);
+  --fs-xl:      clamp(1.38rem, 1.25rem + 0.60vw, 1.69rem);
+  --fs-2xl:     clamp(1.69rem, 1.45rem + 1.10vw, 2.13rem);
+  --fs-display: clamp(2.13rem, 1.80rem + 1.60vw, 3.00rem);
+
+  --lh-tight: 1.2;
+  --lh-normal: 1.5;
+  --lh-loose: 1.7;
+
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  /* Font families - Inter aggiunto in Fase 5; per ora system + Crimson */
+  --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-display: 'Cinzel', Georgia, 'Times New Roman', serif;
+  --font-body: 'Crimson Text', Georgia, serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'Courier New', monospace;
+
+  /* === Shadows === */
+  --sh-1: 0 1px 2px rgba(0,0,0,0.20);
+  --sh-2: 0 2px 6px rgba(0,0,0,0.30), 0 1px 2px rgba(0,0,0,0.20);
+  --sh-3: 0 4px 12px rgba(0,0,0,0.40), 0 2px 4px rgba(0,0,0,0.20);
+  --sh-4: 0 8px 24px rgba(0,0,0,0.50), 0 4px 8px rgba(0,0,0,0.30);
+
+  /* === Z-index === */
+  --z-base: 1;
+  --z-sticky: 100;
+  --z-dropdown: 500;
+  --z-modal-backdrop: 900;
+  --z-modal: 1000;
+  --z-toast: 9999;
+
+  /* === Touch & accessibility === */
+  --touch-min: 44px;
+  --focus-ring: 0 0 0 2px var(--accent-gold);
+
+  /* === Safe area iOS (notch / home indicator) === */
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left, 0px);
+
+  /* === Motion === */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* === Variabili semantiche di testo (alias verso quelle esistenti)
+         Risolvono il bug delle vars usate-ma-mai-definite (--text, --text-muted).
+         Qui sono fallback; vengono ridefinite con i valori reali in style.css. */
+  --text:        #e8e6e3;
+  --text-muted:  #9a9aa8;
+  --text-on-accent: #1a1a2e;
+
+  /* === Stati componenti generici === */
+  --c-success: #51cf66;
+  --c-warning: #ffa500;
+  --c-danger:  #ff6b6b;
+  --c-info:    #74c0fc;
+}
+
+/* Rispetta motion-preferences ridotte */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Focus-visible globale: mostra il ring solo per navigazione tastiera,
+   nascosto per click mouse/touch. Non sovrascrive eventuali ring custom. */
+:focus-visible {
+  outline: 2px solid var(--accent-gold, #f0c674);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
