@@ -1,0 +1,368 @@
+/* ============================================================================
+   PREMIUM UI - Ultimo layer, sovrascrive style.css per estetica moderna.
+   ============================================================================
+   Caricato DOPO design-tokens.css, style.css, ui-enhancements.css, responsive.css,
+   theme-light.css. La cascade naturale fa vincere queste regole.
+
+   Linee guida:
+   - Glassmorphism leggero (backdrop-filter)
+   - Gradients sottili invece di tinte piatte
+   - Micro-animations su hover/focus/active (transform + shadow)
+   - Background ambient con texture pseudo-fantasy
+   - Header brand con logo SVG dorato + tipografia espressiva
+   - Initiative bar "cinematic" con glow per il turno attivo
+   - Buttons con depth-state visivo (hover lift, active press)
+
+   Performance: tutto via CSS-only, niente JS aggiuntivo.
+   Accessibility: rispetta prefers-reduced-motion (definito in design-tokens.css).
+   ========================================================================= */
+
+/* === Background ambient: texture pseudo-pergamena scura ================== */
+body {
+  /* Mantiene il body bg originale ma aggiunge layer di noise + glow centrali */
+  background-image:
+    radial-gradient(ellipse at 20% -10%, rgba(212, 175, 55, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 110%, rgba(120, 80, 40, 0.10) 0%, transparent 60%),
+    radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.0) 0%, rgba(0, 0, 0, 0.30) 100%);
+  background-attachment: fixed;
+  background-size: cover;
+}
+
+/* Texture noise sottile via SVG inline (non serve file extra) */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  background-size: 200px 200px;
+}
+
+/* Tema light: ambient diverso, no noise */
+body.rpg-theme-light::before {
+  opacity: 0;
+}
+body.rpg-theme-light {
+  background-image:
+    radial-gradient(ellipse at 20% -10%, rgba(212, 175, 55, 0.18) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 110%, rgba(180, 140, 80, 0.14) 0%, transparent 60%);
+}
+
+/* === Brand header (room-selector) ====================================== */
+.brand-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--sp-5);
+  align-items: center;
+  padding: var(--sp-5) var(--sp-5);
+  margin-bottom: var(--sp-6);
+  background:
+    linear-gradient(135deg, rgba(212, 175, 55, 0.08) 0%, rgba(0, 0, 0, 0.25) 60%);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-3), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  position: relative;
+  overflow: hidden;
+}
+.brand-header::after {
+  /* Riflesso lucido sottile diagonale */
+  content: '';
+  position: absolute;
+  top: 0; left: -50%;
+  width: 50%; height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+}
+.brand-mark {
+  width: 72px; height: 72px;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle, rgba(212, 175, 55, 0.20), rgba(212, 175, 55, 0));
+  border-radius: 50%;
+  filter: drop-shadow(0 4px 12px rgba(212, 175, 55, 0.25));
+}
+.brand-mark .brand-logo {
+  width: 64px; height: 64px;
+  animation: brand-float 8s ease-in-out infinite;
+}
+@keyframes brand-float {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50%      { transform: translateY(-3px) rotate(2deg); }
+}
+.brand-text { min-width: 0; }
+.brand-title {
+  font-family: 'Cinzel', Georgia, serif;
+  font-weight: 900;
+  font-size: clamp(1.5rem, 1.2rem + 1.5vw, 2.4rem);
+  letter-spacing: 0.03em;
+  background: linear-gradient(180deg, #ffe590 0%, #d9a93a 60%, #8b6520 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0 0 var(--sp-1) 0;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+  line-height: var(--lh-tight);
+}
+.brand-tagline {
+  font-family: 'Crimson Text', Georgia, serif;
+  font-style: italic;
+  color: var(--text-muted);
+  font-size: var(--fs-md);
+  margin: 0;
+}
+.brand-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  justify-content: flex-end;
+}
+.brand-btn {
+  display: inline-flex !important;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4) !important;
+  border-radius: var(--r-pill) !important;
+}
+.brand-btn .btn-icon {
+  font-size: 1.1em;
+  line-height: 1;
+}
+@media (max-width: 720px) {
+  .brand-header {
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    text-align: left;
+  }
+  .brand-actions {
+    grid-column: 1 / -1;
+    justify-content: stretch;
+  }
+  .brand-btn { flex: 1; justify-content: center; }
+}
+
+/* === Card moderne (glassmorphism + lift on hover) ====================== */
+.room-card,
+.character-item,
+.config-card,
+.stat-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(0, 0, 0, 0.20) 100%),
+    var(--bg-light, rgba(20, 20, 35, 0.85));
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: var(--r-lg);
+  box-shadow:
+    var(--sh-2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+  transition:
+    transform var(--duration-base, 200ms) var(--ease-out, ease),
+    box-shadow var(--duration-base, 200ms) var(--ease-out, ease),
+    border-color var(--duration-base, 200ms) var(--ease-out, ease);
+  position: relative;
+  z-index: 1;
+}
+.room-card:hover,
+.config-card:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.45),
+    0 4px 8px rgba(212, 175, 55, 0.20),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-color: rgba(212, 175, 55, 0.55);
+}
+.room-card:active,
+.config-card:active {
+  transform: translateY(-2px);
+}
+
+/* === Buttons con depth + active feedback =============================== */
+.btn,
+button.btn {
+  position: relative;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(0, 0, 0, 0.30);
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  transition:
+    transform var(--duration-fast, 120ms) var(--ease-out, ease),
+    box-shadow var(--duration-fast, 120ms) var(--ease-out, ease),
+    filter var(--duration-fast, 120ms) var(--ease-out, ease);
+  font-weight: var(--fw-semibold, 600);
+  letter-spacing: 0.02em;
+}
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.40),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  filter: brightness(1.08);
+}
+.btn:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.40),
+    inset 0 2px 4px rgba(0, 0, 0, 0.30);
+  filter: brightness(0.95);
+}
+.btn:disabled {
+  transform: none !important;
+  filter: grayscale(0.5) brightness(0.7);
+  cursor: not-allowed;
+}
+.btn.primary {
+  background: linear-gradient(180deg, #f0c674 0%, #c89a3e 50%, #8d6a22 100%);
+  color: #1a1208;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.btn.success {
+  background: linear-gradient(180deg, #6cdb7e 0%, #43a35a 60%, #2c6f3c 100%);
+  color: #0a1f10;
+}
+.btn.danger {
+  background: linear-gradient(180deg, #ff8c8c 0%, #d44a4a 60%, #8a2424 100%);
+  color: #ffffff;
+}
+.btn.warning {
+  background: linear-gradient(180deg, #ffd16b 0%, #d9943e 60%, #8c5a1a 100%);
+  color: #1a1208;
+}
+.btn.secondary {
+  background: linear-gradient(180deg, rgba(60, 60, 80, 0.95) 0%, rgba(35, 35, 55, 0.95) 100%);
+  color: var(--text);
+  border-color: rgba(212, 175, 55, 0.35);
+}
+
+/* === Initiative bar "cinematic" ======================================== */
+.turn-card {
+  position: relative;
+  transition:
+    transform var(--duration-base, 200ms) var(--ease-out, ease),
+    box-shadow var(--duration-base, 200ms) var(--ease-out, ease);
+}
+.turn-card.active {
+  transform: scale(1.08);
+  z-index: 2;
+  box-shadow:
+    0 0 0 2px var(--accent-gold, #f0c674),
+    0 0 24px rgba(212, 175, 55, 0.55),
+    0 8px 16px rgba(0, 0, 0, 0.50);
+  animation: turn-pulse 2.4s ease-in-out infinite;
+}
+@keyframes turn-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--accent-gold), 0 0 24px rgba(212, 175, 55, 0.55), 0 8px 16px rgba(0, 0, 0, 0.50); }
+  50%      { box-shadow: 0 0 0 2px var(--accent-gold), 0 0 36px rgba(212, 175, 55, 0.80), 0 8px 16px rgba(0, 0, 0, 0.50); }
+}
+.turn-card .init-badge {
+  font-family: 'Cinzel', serif;
+  font-weight: 900;
+  background: linear-gradient(180deg, #ffe590 0%, #c89a3e 100%);
+  color: #1a1208;
+  border-radius: var(--r-pill);
+  padding: 2px 8px;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.40), inset 0 1px 0 rgba(255, 255, 255, 0.30);
+}
+
+/* === Inputs polish ===================================================== */
+input[type="text"], input[type="number"], input[type="email"],
+input[type="search"], select, textarea {
+  transition:
+    border-color var(--duration-base, 200ms) var(--ease-out, ease),
+    box-shadow var(--duration-base, 200ms) var(--ease-out, ease),
+    background var(--duration-base, 200ms) var(--ease-out, ease);
+}
+input[type="text"]:focus, input[type="number"]:focus,
+input[type="email"]:focus, input[type="search"]:focus,
+select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent-gold, #f0c674);
+  box-shadow:
+    0 0 0 3px rgba(212, 175, 55, 0.20),
+    inset 0 1px 2px rgba(0, 0, 0, 0.30);
+}
+
+/* Init input "cinzel" badge style */
+.init-input {
+  font-weight: 700;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.30), rgba(212, 175, 55, 0.06));
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.40);
+}
+
+/* === Empty state moderno =============================================== */
+.empty-state {
+  background:
+    radial-gradient(ellipse at center, rgba(212, 175, 55, 0.08) 0%, transparent 70%);
+  border: 2px dashed rgba(212, 175, 55, 0.25);
+  border-radius: var(--r-xl);
+  padding: var(--sp-7) var(--sp-5);
+}
+.empty-state-icon {
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.30));
+  animation: empty-bob 4s ease-in-out infinite;
+  display: inline-block;
+}
+@keyframes empty-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+
+/* === Server info card (room-selector) con QR centrato ================== */
+.server-info {
+  background:
+    linear-gradient(135deg, rgba(212, 175, 55, 0.06), rgba(0, 0, 0, 0.30)) !important;
+  border: 1px solid rgba(212, 175, 55, 0.30) !important;
+  border-radius: var(--r-xl) !important;
+  padding: var(--sp-5) !important;
+  box-shadow: var(--sh-3), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  position: relative;
+}
+#qr-container {
+  transition: transform var(--duration-base, 200ms) var(--ease-out, ease);
+}
+#qr-container:hover { transform: scale(1.04); }
+
+/* === Sezione "Crea stanza" highlight =================================== */
+.create-room-section {
+  background:
+    linear-gradient(135deg, rgba(212, 175, 55, 0.10), rgba(0, 0, 0, 0.20)) !important;
+  border: 1px solid rgba(212, 175, 55, 0.40) !important;
+  border-radius: var(--r-xl) !important;
+  box-shadow: var(--sh-3), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+  position: relative;
+  overflow: hidden;
+}
+.create-room-section h2 {
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  color: var(--accent-gold);
+  margin-top: 0;
+}
+
+/* === Z-index lift per evitare che noise overlay catturi click =========== */
+.room-selector-container,
+.master-container,
+.config-container,
+.player-container,
+.tablet-container {
+  position: relative;
+  z-index: 1;
+}
+
+/* === Scroll snap + smooth per liste lunghe ============================== */
+.rooms-grid,
+.heroes-list,
+.enemies-list,
+.allies-list {
+  scroll-behavior: smooth;
+}
+
+/* === Selezione testo dorata =========================================== */
+::selection {
+  background: rgba(212, 175, 55, 0.40);
+  color: #fff;
+}

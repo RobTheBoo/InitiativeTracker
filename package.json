@@ -13,12 +13,19 @@
       "electron/**/*",
       "public/**/*",
       "!public/images/**/*",
+      "src/**/*",
       "data/**/*",
       "server.js",
       "package.json"
     ],
     "win": {
       "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
         {
           "target": "dir",
           "arch": [
@@ -30,7 +37,12 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "RPG Initiative Tracker",
+      "artifactName": "RPG-Initiative-Tracker-Setup-${version}.${ext}"
     },
     "mac": {
       "target": [

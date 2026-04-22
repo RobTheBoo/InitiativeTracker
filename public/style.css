@@ -1324,6 +1324,9 @@ h4 { font-size: var(--fs-base, 0.95rem); margin-bottom: var(--sp-2, 8px); color:
 
 .char-controls {
   margin-bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .init-input {
@@ -1336,6 +1339,47 @@ h4 { font-size: var(--fs-base, 0.95rem); margin-bottom: var(--sp-2, 8px); color:
   border: 1px solid var(--border-gold);
   border-radius: 5px;
   color: var(--accent-gold);
+}
+
+/* Tiebreaker decimale: campo piccolo accanto a init.
+   - .inactive (no tie): grigio, opacita' ridotta, disabled
+   - .active (in tie):   evidenziato in giallo, editabile dal master */
+.tie-input {
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  width: 36px;
+  text-align: center;
+  padding: 5px 4px;
+  border-radius: 5px;
+  font-size: 0.95rem;
+  -moz-appearance: textfield;
+  appearance: textfield;
+  transition: all var(--duration-base, 200ms) var(--ease-out, ease);
+}
+.tie-input::-webkit-outer-spin-button,
+.tie-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.tie-input.inactive {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px dashed rgba(212, 175, 55, 0.25);
+  color: rgba(212, 175, 55, 0.35);
+  cursor: not-allowed;
+}
+.tie-input.active {
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.18), rgba(212, 175, 55, 0.05));
+  border: 1px solid var(--accent-gold);
+  color: var(--accent-gold);
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.15), 0 1px 4px rgba(212, 175, 55, 0.25);
+  cursor: text;
+}
+.tie-input.active::before {
+  content: ".";
+}
+.tie-input.active:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-gold), 0 0 12px rgba(212, 175, 55, 0.5);
 }
 
 .char-effects {

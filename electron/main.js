@@ -11,6 +11,16 @@ let mainWindow = null;
 let server = null;
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
+function focusWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  // Su Windows il primo click dopo loadFile va sprecato per portare focus al
+  // chrome della finestra invece che al renderer. Forziamo show + focus per
+  // far si' che gli input HTML siano editabili al primo click reale.
+  if (!mainWindow.isVisible()) mainWindow.show();
+  mainWindow.focus();
+  mainWindow.webContents.focus();
+}
+
 function createWindow() {
   const localIP = getPrimaryLocalIP();
 
@@ -19,15 +29,22 @@ function createWindow() {
     height: 900,
     minWidth: 1000,
     minHeight: 700,
+    show: false, // mostriamo dopo ready-to-show per evitare flash bianco e focus bug
+    backgroundColor: '#1a1a2e',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      webSecurity: true
+      webSecurity: true,
+      spellcheck: false
     },
     icon: path.join(__dirname, '../public/icon.png'),
     title: 'RPG Initiative Tracker'
   });
+
+  mainWindow.once('ready-to-show', focusWindow);
+  // loadFile successivi (cambio pagina): rimettiamo focus sul renderer.
+  mainWindow.webContents.on('did-finish-load', focusWindow);
 
   // CSP: permette connessioni a localhost e all'IP della rete locale
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {

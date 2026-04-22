@@ -1,4 +1,4 @@
-const { generateId, calculateTurnOrder, findInitiativeTies, decrementEffects } = require('./game-logic');
+const { generateId, calculateTurnOrder, findInitiativeTies, assignTiebreakers, decrementEffects } = require('./game-logic');
 const path = require('path');
 const fs = require('fs');
 
@@ -287,8 +287,12 @@ class RoomManager {
     socket.on('undelayCharacter', (charId) => this.handleUndelayCharacter(socket, charId));
     socket.on('undelayCharacterWithPosition', (data) => this.handleUndelayCharacterWithPosition(socket, data));
     
-    // Iniziative uguali
+    // Iniziative uguali (legacy - mantenuto per compat con vecchi client)
     socket.on('setInitiativeOrder', (data) => this.handleSetInitiativeOrder(socket, data));
+
+    // Tiebreaker decimale: il master modifica manualmente l'ordine fra
+    // personaggi con stessa iniziativa (sostituisce il modal).
+    socket.on('setInitiativeTiebreaker', (data) => this.handleSetInitiativeTiebreaker(socket, data));
   }
 
   // Handler individuali (implementazione completa dal server.js)
@@ -377,22 +381,20 @@ class RoomManager {
 
     const hero = gs.heroes.find(h => h.id === heroId);
     if (hero && (hero.ownerId === socket.id || socket.id === gs.masterId)) {
-      hero.initiative = parseInt(initiative);
+      const newInit = parseInt(initiative);
+      // Se cambia il valore intero, resetta il tiebreaker (sara' riassegnato)
+      if (Number.isFinite(newInit) && newInit !== hero.initiative) {
+        hero.initiativeTie = null;
+      }
+      hero.initiative = newInit;
       hero.initiativeOrder = null;
-      // Se il combattimento è già iniziato, ricalcola il turnOrder per includere l'eroe
+      assignTiebreakers(gs);
       if (gs.combatStarted) {
-        const ties = findInitiativeTies(gs);
-        if (ties.length > 0) {
-          this.io.to(gs.masterId).emit('resolveInitiativeTies', ties);
-        } else {
-          gs.turnOrder = calculateTurnOrder(gs);
-          // Aggiusta currentTurn se necessario
-          if (gs.currentTurn >= gs.turnOrder.length && gs.turnOrder.length > 0) {
-            gs.currentTurn = 0;
-          }
+        gs.turnOrder = calculateTurnOrder(gs);
+        if (gs.currentTurn >= gs.turnOrder.length && gs.turnOrder.length > 0) {
+          gs.currentTurn = 0;
         }
       }
-      
       this.broadcastAndSave(socket.roomId);
     }
   }
@@ -478,12 +480,16 @@ class RoomManager {
 
     const enemy = gs.enemies.find(e => e.id === enemyId);
     if (enemy) {
-      enemy.initiative = parseInt(initiative);
+      const newInit = parseInt(initiative);
+      if (Number.isFinite(newInit) && newInit !== enemy.initiative) {
+        enemy.initiativeTie = null;
+      }
+      enemy.initiative = newInit;
       enemy.initiativeOrder = null;
+      assignTiebreakers(gs);
       if (gs.combatStarted) {
         gs.turnOrder = calculateTurnOrder(gs);
       }
-      
       this.broadcastAndSave(socket.roomId);
     }
   }
@@ -580,12 +586,16 @@ class RoomManager {
 
     const ally = gs.allies.find(a => a.id === allyId);
     if (ally) {
-      ally.initiative = parseInt(initiative);
+      const newInit = parseInt(initiative);
+      if (Number.isFinite(newInit) && newInit !== ally.initiative) {
+        ally.initiativeTie = null;
+      }
+      ally.initiative = newInit;
       ally.initiativeOrder = null;
+      assignTiebreakers(gs);
       if (gs.combatStarted) {
         gs.turnOrder = calculateTurnOrder(gs);
       }
-      
       this.broadcastAndSave(socket.roomId);
     }
   }
@@ -762,12 +772,14 @@ class RoomManager {
 
     const summon = gs.summons.find(s => s.id === summonId);
     if (summon && (summon.createdBy === socket.id || socket.id === gs.masterId)) {
-      summon.initiative = parseInt(initiative) || null;
+      const newInit = parseInt(initiative) || null;
+      if (newInit !== summon.initiative) summon.initiativeTie = null;
+      summon.initiative = newInit;
       summon.initiativeOrder = null;
+      assignTiebreakers(gs);
       if (gs.combatStarted) {
         gs.turnOrder = calculateTurnOrder(gs);
       }
-      
       this.broadcastAndSave(socket.roomId);
     }
   }
@@ -783,19 +795,31 @@ class RoomManager {
     const readySummons = (gs.summons || []).filter(s => s.initiative !== null);
 
     if (heroesWithInit.length > 0 || readyEnemies.length > 0 || readyAllies.length > 0 || readySummons.length > 0) {
-      const ties = findInitiativeTies(gs);
-
-      if (ties.length > 0) {
-        this.io.to(gs.masterId).emit('resolveInitiativeTies', ties);
-      } else {
-        gs.turnOrder = calculateTurnOrder(gs);
-        gs.currentTurn = 0;
-        gs.currentRound = 1;
-        gs.combatStarted = true;
-        this.broadcastAndSave(socket.roomId);
-        this.io.to(socket.roomId).emit('combatStarted');
-      }
+      // Tiebreaker decimale: assegna automaticamente .1/.2/.3 a chi e' in pari.
+      // Rispetta i valori gia' impostati dal master manualmente.
+      assignTiebreakers(gs);
+      gs.turnOrder = calculateTurnOrder(gs);
+      gs.currentTurn = 0;
+      gs.currentRound = 1;
+      gs.combatStarted = true;
+      this.broadcastAndSave(socket.roomId);
+      this.io.to(socket.roomId).emit('combatStarted');
     }
+  }
+
+  handleSetInitiativeTiebreaker(socket, { charId, tiebreaker }) {
+    const gs = this.getGameState(socket);
+    if (!gs || socket.id !== gs.masterId) return;
+    const all = [...gs.heroes, ...gs.enemies, ...gs.allies, ...(gs.summons || [])];
+    const char = all.find(c => c.id === charId);
+    if (!char) return;
+    const t = tiebreaker === '' || tiebreaker == null ? null : parseInt(tiebreaker, 10);
+    char.initiativeTie = (Number.isInteger(t) && t >= 1 && t <= 9) ? t : null;
+    // Riassegna gli altri per evitare collisioni (la modifica manuale del master
+    // ha priorita'; gli altri si "spostano" sul primo slot libero)
+    assignTiebreakers(gs);
+    if (gs.combatStarted) gs.turnOrder = calculateTurnOrder(gs);
+    this.broadcastAndSave(socket.roomId);
   }
 
   handleNextTurn(socket) {
@@ -923,20 +947,15 @@ class RoomManager {
       newInitiative = Math.floor(gs.turnOrder[gs.turnOrder.length - 1].initiative);
     }
 
-    // Assegna l'iniziativa intera al rientrante e azzera ordine tie
     originalChar.initiative = newInitiative;
+    originalChar.initiativeTie = null;
     originalChar.initiativeOrder = null;
 
     gs.delayedCharacters.splice(delayedIndex, 1);
 
-    // Controlla se ci sono tie da risolvere (il rientrante con init intera crea un tie)
-    const ties = findInitiativeTies(gs);
-    if (ties.length > 0) {
-      this.io.to(gs.masterId).emit('resolveInitiativeTies', ties);
-    } else {
-      gs.turnOrder = calculateTurnOrder(gs);
-    }
-
+    // Tiebreaker auto: il rientrante e' messo in coda al gruppo con stessa init.
+    assignTiebreakers(gs);
+    gs.turnOrder = calculateTurnOrder(gs);
     this.broadcastAndSave(socket.roomId);
   }
 
@@ -949,30 +968,29 @@ class RoomManager {
   handleSetInitiativeOrder(socket, { initiative, orderedIds }) {
     const gs = this.getGameState(socket);
     if (!gs || socket.id !== gs.masterId) return;
+    // Legacy: il client vecchio mandava orderedIds dal modal "scegli chi va prima".
+    // Ora trasformiamo l'ordine relativo in tiebreakers (1..N) per uniformare al
+    // nuovo modello decimale.
     const allChars = [...gs.heroes, ...gs.enemies, ...gs.allies, ...(gs.summons || [])];
     orderedIds.forEach((id, index) => {
       const char = allChars.find(c => c.id == id);
       if (char) {
-        char.initiativeOrder = index + 1;
         char.initiative = parseInt(initiative);
+        char.initiativeTie = Math.min(9, index + 1);
+        char.initiativeOrder = null;
       }
     });
-    const ties = findInitiativeTies(gs);
-
-    if (ties.length > 0) {
-      this.io.to(gs.masterId).emit('resolveInitiativeTies', ties);
+    assignTiebreakers(gs);
+    if (!gs.combatStarted) {
+      gs.turnOrder = calculateTurnOrder(gs);
+      gs.currentTurn = 0;
+      gs.currentRound = 1;
+      gs.combatStarted = true;
+      this.broadcastAndSave(socket.roomId);
+      this.io.to(socket.roomId).emit('combatStarted');
     } else {
-      if (!gs.combatStarted) {
-        gs.turnOrder = calculateTurnOrder(gs);
-        gs.currentTurn = 0;
-        gs.currentRound = 1;
-        gs.combatStarted = true;
-        this.broadcastAndSave(socket.roomId);
-        this.io.to(socket.roomId).emit('combatStarted');
-      } else {
-        gs.turnOrder = calculateTurnOrder(gs);
-        this.broadcastAndSave(socket.roomId);
-      }
+      gs.turnOrder = calculateTurnOrder(gs);
+      this.broadcastAndSave(socket.roomId);
     }
   }
 

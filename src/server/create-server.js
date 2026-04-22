@@ -53,7 +53,21 @@ function createServer(opts = {}) {
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // ----- Static -----
-  app.use(express.static(paths.publicDir));
+  // Cache-Control: HTML mai cachato (max-age=0) per garantire che i client
+  // ricevano subito le UI nuove dopo update; asset statici (CSS/JS/SVG/PNG)
+  // con must-revalidate cosi' il browser fa una HEAD prima di servire da cache
+  // (no stale assets dopo un update dell'app installata).
+  app.use(express.static(paths.publicDir, {
+    etag: true,
+    lastModified: true,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      } else {
+        res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+      }
+    }
+  }));
 
   // ----- Health -----
   app.get('/api/health', (req, res) => {

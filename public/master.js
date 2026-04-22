@@ -283,8 +283,7 @@ function renderHeroesList() {
             `<button onclick="removeSummon('${hero.id}')" class="btn tiny danger" title="Rimuovi evocazione">✕</button>` : ''}
         </div>
         <div class="char-controls">
-          <input type="number" class="init-input" value="${hero.initiative !== null ? Math.floor(hero.initiative) : ''}" 
-                 placeholder="Init" min="1" onchange="setHeroInit('${hero.id}', this.value)">
+          ${renderInitiativeFields(hero, 'setHeroInit')}
         </div>
         <div class="char-effects">
           ${hero.effects.map(eff => `
@@ -307,6 +306,26 @@ function renderHeroesList() {
     `;
   }).join('');
   
+}
+
+// Renderizza i due campi (init + tiebreaker decimale) per qualunque char.
+// - init-input: intero, modificabile sempre
+// - tie-input: 1..9, ABILITATO solo se il char condivide initiative con altri.
+//   Quando ci sono ties il backend auto-assegna 1,2,3 ma il master puo' editare.
+function renderInitiativeFields(char, setterFnName) {
+  const initVal = char.initiative !== null && char.initiative !== undefined ? Math.floor(char.initiative) : '';
+  const tieVal = (char.initiativeTie != null && char.initiativeTie !== '') ? char.initiativeTie : '';
+  const hasTie = tieVal !== '';
+  const tieDisabled = !hasTie ? 'disabled' : '';
+  return `
+    <input type="number" class="init-input" value="${initVal}"
+           placeholder="Init" min="0" onchange="${setterFnName}('${char.id}', this.value)">
+    <input type="number" class="tie-input ${hasTie ? 'active' : 'inactive'}"
+           value="${tieVal}" placeholder="·" min="1" max="9" step="1"
+           title="${hasTie ? 'Ordine in pari iniziativa (1-9). Modifica per cambiare l\\'ordine.' : 'Disponibile solo se due personaggi hanno la stessa iniziativa.'}"
+           ${tieDisabled}
+           onchange="setCharTiebreaker('${char.id}', this.value)">
+  `;
 }
 
 // Rendering lista nemici
@@ -333,8 +352,7 @@ function renderEnemiesList() {
           <button onclick="removeEnemy('${enemy.id}')" class="btn tiny danger">✕</button>
         </div>
         <div class="char-controls">
-          <input type="number" class="init-input" value="${enemy.initiative !== null ? Math.floor(enemy.initiative) : ''}" 
-                 placeholder="Init" min="1" onchange="setEnemyInit('${enemy.id}', this.value)">
+          ${renderInitiativeFields(enemy, 'setEnemyInit')}
         </div>
         <div class="char-effects">
           ${enemy.effects.map(eff => `
@@ -403,8 +421,7 @@ function renderAlliesList() {
           <button onclick="removeAlly('${ally.id}')" class="btn tiny danger">✕</button>
         </div>
         <div class="char-controls">
-          <input type="number" class="init-input" value="${ally.initiative !== null ? Math.floor(ally.initiative) : ''}" 
-                 placeholder="Init" min="1" onchange="setAllyInit('${ally.id}', this.value)">
+          ${renderInitiativeFields(ally, 'setAllyInit')}
         </div>
         <div class="char-effects">
           ${ally.effects.map(eff => `
@@ -500,11 +517,15 @@ function renderInitiativeBar() {
     const charClass = char.isEnemy ? 'enemy' : (char.isAlly ? 'ally' : (char.isSummon ? 'summon' : 'hero'));
     const summonInfo = char.isSummon ? ` <span style="font-size: 0.7rem; color: var(--text-muted);">(${char.remainingRounds}rnd)</span>` : '';
     
+    // Mostra l'iniziativa col tiebreaker decimale (es. 12.1) se presente, cosi'
+    // il master vede subito quale char "vince" il pari.
+    const initBase = Math.floor(Number(char.initiative));
+    const tie = (char.initiativeTie != null && char.initiativeTie !== '') ? `.${char.initiativeTie}` : '';
     return `
       <div class="turn-card ${isActive ? 'active' : ''} ${charClass}">
         <div class="portrait">${renderPortrait(char, 'small')}</div>
         <div class="name">${char.name}${summonInfo}</div>
-        <div class="init-badge">${Math.floor(char.initiative)}</div>
+        <div class="init-badge">${initBase}${tie}</div>
       </div>
     `;
   }).join('');
@@ -588,6 +609,12 @@ window.setHeroInit = function(heroId, initiative) {
   } else {
   socket.emit('setHeroInitiative', { heroId, initiative });
   }
+};
+
+// Tiebreaker decimale: il master modifica manualmente l'ordine fra char con
+// stessa iniziativa intera. Valori validi 1..9; '' o null lo disattiva.
+window.setCharTiebreaker = function(charId, tiebreaker) {
+  socket.emit('setInitiativeTiebreaker', { charId, tiebreaker });
 };
 
 window.removeSummon = function(summonId) {
@@ -866,16 +893,19 @@ socket.on('newRound', (round) => {
   console.log('Nuovo round:', round);
 });
 
-// === Gestione iniziative uguali ===
+// === Gestione iniziative uguali (LEGACY) ===
+// Il backend non emette piu' resolveInitiativeTies: il tiebreaker decimale viene
+// auto-assegnato e il master puo' modificarlo dal campo "tie" accanto a Init.
+// Il listener resta solo per backward-compat con vecchi save in-flight: se per
+// qualche motivo riceviamo un tie, lo ignoriamo silenziosamente.
 let currentTies = [];
 let currentTieIndex = 0;
 let orderedSelections = [];
 
-socket.on('resolveInitiativeTies', (ties) => {
-  currentTies = ties;
-  currentTieIndex = 0;
-  orderedSelections = [];
-  showNextTie();
+socket.on('resolveInitiativeTies', () => {
+  // No-op: la nuova feature tiebreaker decimale risolve automaticamente.
+  const modal = document.getElementById('initiative-tie-modal');
+  if (modal) modal.style.display = 'none';
 });
 
 function showNextTie() {

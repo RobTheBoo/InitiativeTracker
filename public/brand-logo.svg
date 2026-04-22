@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- D20 dorato stilizzato. Favicon, hero image e badge dell'app.
+     Palette: oro #f0c674 in armonia con design-tokens.css -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd86b"/>
+      <stop offset="0.55" stop-color="#d9a93a"/>
+      <stop offset="1" stop-color="#7a5a17"/>
+    </linearGradient>
+    <linearGradient id="goldFace" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe590"/>
+      <stop offset="1" stop-color="#b58a2a"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.6">
+      <stop offset="0" stop-color="rgba(240,198,116,0.6)"/>
+      <stop offset="1" stop-color="rgba(240,198,116,0)"/>
+    </radialGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- Halo dorato di sfondo per la sensazione "magica" -->
+  <circle cx="32" cy="32" r="30" fill="url(#halo)"/>
+
+  <!-- Corpo del D20: poligono icosaedrico stilizzato in 2D -->
+  <g filter="url(#softShadow)">
+    <polygon points="32,4 56,18 56,46 32,60 8,46 8,18"
+             fill="url(#goldGrad)" stroke="#3a2c0e" stroke-width="1.2"/>
+    <!-- Faccia frontale -->
+    <polygon points="32,12 48,22 48,42 32,52 16,42 16,22"
+             fill="url(#goldFace)" stroke="#3a2c0e" stroke-width="0.8"/>
+    <!-- Linee delle facce per dare profondita' al D20 -->
+    <line x1="32" y1="12" x2="32" y2="52" stroke="#3a2c0e" stroke-width="0.6" opacity="0.5"/>
+    <line x1="16" y1="22" x2="48" y2="42" stroke="#3a2c0e" stroke-width="0.6" opacity="0.5"/>
+    <line x1="48" y1="22" x2="16" y2="42" stroke="#3a2c0e" stroke-width="0.6" opacity="0.5"/>
+  </g>
+
+  <!-- "20" sulla faccia - typeface heavy serif per evocare Cinzel -->
+  <text x="32" y="38" font-family="Georgia, 'Times New Roman', serif"
+        font-weight="900" font-size="16" fill="#1a1208"
+        text-anchor="middle" letter-spacing="-0.5">20</text>
+
+  <!-- Scintille decorative (8 punti cardinali) -->
+  <g fill="#fff5cc" opacity="0.85">
+    <circle cx="32" cy="3"  r="1.2"/>
+    <circle cx="32" cy="61" r="1.0"/>
+    <circle cx="3"  cy="32" r="1.0"/>
+    <circle cx="61" cy="32" r="1.2"/>
+    <circle cx="11" cy="11" r="0.8"/>
+    <circle cx="53" cy="53" r="0.8"/>
+    <circle cx="53" cy="11" r="0.8"/>
+    <circle cx="11" cy="53" r="0.8"/>
+  </g>
+</svg>

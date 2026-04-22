@@ -41,9 +41,18 @@ class ConfigStore {
   }
 
   load() {
+    // Read-after-write coherence: se c'e' una scrittura debounced in coda
+    // (o solo una mutazione in-memory non ancora flushed), restituiamo lo
+    // stato in-memory invece di quello su disco. Senza questo, una GET
+    // immediatamente dopo una POST tornerebbe dati vecchi e l'UI mostrerebbe
+    // la modifica solo dopo refresh manuale.
+    if (this._cache && this._pendingWrite) {
+      return this._cache;
+    }
     try {
       if (!fs.existsSync(this.configPath)) {
-        return { ...DEFAULT_CONFIG };
+        // Se non esiste su disco ma abbiamo un cache valido, preferiamolo
+        return this._cache ? this._cache : { ...DEFAULT_CONFIG };
       }
       const raw = fs.readFileSync(this.configPath, 'utf8');
       const parsed = JSON.parse(raw);
