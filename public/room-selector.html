@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="ui-enhancements.css">
   <link rel="stylesheet" href="responsive.css">
   <link rel="stylesheet" href="theme-light.css">
-  <link rel="stylesheet" href="premium-ui.css?v=3">
+  <link rel="stylesheet" href="premium-ui.css?v=4">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Text:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script defer src="theme-toggle.js"></script>
   <style>
@@ -245,11 +245,12 @@
   <div id="folder-setup-modal" class="setup-overlay" style="display:none;">
     <div class="setup-card" role="dialog" aria-modal="true" aria-labelledby="setup-title">
       <header class="setup-header">
-        <h2 id="setup-title">📁 Dove vuoi salvare i tuoi dati?</h2>
+        <h2 id="setup-title">📁 Popola cartella di lavoro</h2>
         <p class="setup-sub">
           L'app userà <strong>una cartella sul tuo PC</strong> per personaggi, stanze e immagini.
-          Se la metti dentro <strong>OneDrive</strong>, <strong>Google Drive</strong> o <strong>Dropbox</strong>,
-          i dati si sincronizzano da soli su tutti i tuoi dispositivi.
+          Per default punta alla <strong>cartella dati del programma</strong> (dove sono già le immagini installate),
+          ma puoi sceglierne una <strong>dentro OneDrive / Google Drive / Dropbox</strong> per sincronizzare
+          tra più PC. L'app crea da sola tutte le sottocartelle.
         </p>
       </header>
 
@@ -257,19 +258,19 @@
         <label class="setup-label" for="setup-path-input">Percorso della cartella:</label>
         <div class="setup-row">
           <input id="setup-path-input" class="setup-input" type="text"
-                 placeholder="es. C:\Users\TuoNome\OneDrive\RPG-Tracker">
+                 placeholder="Verrà suggerita la cartella dati del programma">
           <button id="setup-browse-btn" class="btn secondary" style="display:none;">📂 Sfoglia…</button>
         </div>
         <div id="setup-hint" class="setup-hint">
-          Suggerimento: scegli una cartella che non esiste ancora — l'app la crea con la struttura giusta
-          (<code>images/heroes</code>, <code>images/enemies</code>, ecc.).
+          Suggerimento: lascia il default (cartella dati del programma) per usare l'app subito,
+          oppure punta una sottocartella di <code>OneDrive</code> per sincronizzare i dati su più PC.
         </div>
         <div id="setup-status" class="setup-status" style="display:none;"></div>
       </div>
 
       <footer class="setup-footer">
         <button id="setup-skip-btn" class="btn secondary">Salta per ora</button>
-        <button id="setup-confirm-btn" class="btn primary large">✨ Crea e usa questa cartella</button>
+        <button id="setup-confirm-btn" class="btn primary large">📁 Popola questa cartella</button>
       </footer>
     </div>
   </div>
@@ -365,8 +366,8 @@
     }
   </style>
 
-  <script src="room-selector.js?v=3"></script>
-  <script src="folder-setup-wizard.js?v=3"></script>
+  <script src="room-selector.js?v=4"></script>
+  <script src="folder-setup-wizard.js?v=4"></script>
 </body>
 </html>
 

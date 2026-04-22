@@ -57,7 +57,7 @@
       $('folder-auto-export').checked = !!s.autoExport;
 
       if (!s.folderPath) {
-        setStatusLine('Nessuna cartella configurata. Indica un path e premi <strong>Salva</strong>.', 'var(--text-dim)');
+        setStatusLine('Nessuna cartella configurata. Premi <strong>Popola cartella di lavoro</strong> per iniziare.', 'var(--text-dim)');
         return;
       }
       const usable = s.folderUsable;
@@ -136,12 +136,38 @@
     const newRooms = analysis.rooms.filter(r => !r.exists).length;
     const conflicts = analysis.rooms.filter(r => r.exists);
 
+    const cfgC = analysis.configCounts;
+    const cfgLine = analysis.hasConfig
+      ? `✅ presente${cfgC ? ` — eroi:${cfgC.heroes}, nemici:${cfgC.enemies}, NPC:${cfgC.allies}, evocazioni:${cfgC.summons}, effetti:${cfgC.effects}` : ''}`
+      : '<em style="color: var(--text-dim);">assente</em>';
+
+    const imgPerSub = analysis.imagesPerSub || {};
+    const imgLine = `${analysis.imageCount} (heroes:${imgPerSub.heroes||0}, enemies:${imgPerSub.enemies||0}, allies:${imgPerSub.allies||0}, summons:${imgPerSub.summons||0})`;
+
+    const warnings = (analysis.warnings || []);
+    const blockers = (analysis.blockers || []);
+
+    let validation = '';
+    if (blockers.length) {
+      validation += `<div style="background: rgba(220,80,80,0.12); border: 1px solid rgba(220,80,80,0.45); color: #ff9a9a; padding: 10px; border-radius: 6px; margin-top: 12px;">
+        <strong>⛔ Import bloccato:</strong>
+        <ul style="margin: 6px 0 0 18px;">${blockers.map(b => '<li>' + escapeHtml(b) + '</li>').join('')}</ul>
+      </div>`;
+    }
+    if (warnings.length) {
+      validation += `<div style="background: rgba(212,175,55,0.10); border: 1px solid rgba(212,175,55,0.40); color: var(--accent-gold); padding: 10px; border-radius: 6px; margin-top: 12px;">
+        <strong>⚠️ Avvisi:</strong>
+        <ul style="margin: 6px 0 0 18px; color: var(--text-light);">${warnings.map(w => '<li>' + escapeHtml(w) + '</li>').join('')}</ul>
+      </div>`;
+    }
+
     summary.innerHTML = `
-      <div>📂 <strong>${analysis.folderPath}</strong></div>
-      <div>📋 Manifest: ${analysis.manifest ? 'presente (v' + analysis.manifest.version + ')' : '<em style="color: var(--text-dim);">assente</em>'}</div>
-      <div>⚙️ Config libreria: ${analysis.hasConfig ? '✅ presente' : '<em style="color: var(--text-dim);">assente</em>'}</div>
-      <div>🖼️ Immagini: ${analysis.imageCount}</div>
+      <div>📂 <strong>${escapeHtml(analysis.folderPath)}</strong></div>
+      <div>📋 Manifest: ${analysis.manifest ? 'presente (v' + escapeHtml(String(analysis.manifest.version)) + ')' : '<em style="color: var(--text-dim);">assente</em>'}</div>
+      <div>⚙️ Libreria personaggi: ${cfgLine}</div>
+      <div>🖼️ Immagini: ${imgLine}</div>
       <div>🏰 Stanze: ${totalRooms} totali, ${newRooms} nuove, ${conflicts.length} esistenti</div>
+      ${validation}
     `;
 
     if (conflicts.length === 0) {
@@ -152,7 +178,7 @@
         <div style="display: flex; gap: 8px; align-items: center; padding: 8px; border-bottom: 1px solid var(--border-gold);">
           <div style="flex: 1; color: var(--text-light);">
             <div style="font-weight: 600;">${escapeHtml(r.name)}</div>
-            <div style="font-size: 0.8rem; color: var(--text-dim);">${escapeHtml(r.id)}</div>
+            <div style="font-size: 0.8rem; color: var(--text-dim);">${escapeHtml(r.id)}${r.hasGameState ? '' : ' · <em>senza gameState</em>'}</div>
           </div>
           <select class="folder-conflict-decision" data-room-id="${escapeHtml(r.id)}"
                   style="background: var(--bg-dark); color: var(--text-light); border: 1px solid var(--border-gold); padding: 6px; border-radius: 4px;">
@@ -161,6 +187,13 @@
           </select>
         </div>
       `).join('');
+    }
+
+    // Disabilita Importa se ci sono blockers.
+    const confirmBtn = $('folder-import-confirm-btn');
+    if (confirmBtn) {
+      confirmBtn.disabled = !analysis.canImport;
+      confirmBtn.title = analysis.canImport ? '' : 'Risolvi i blockers per procedere';
     }
 
     $('folder-import-modal').dataset.analysis = JSON.stringify(analysis);
@@ -200,16 +233,21 @@
   // ----- Export -----
   async function doExport() {
     const folderPath = $('folder-path-input').value.trim();
-    if (!folderPath) { alert('Configura prima la cartella'); return; }
+    if (!folderPath) { alert('Configura prima la cartella (Popola cartella di lavoro)'); return; }
     try {
       const r = await apiPost('/api/folder/export', { folderPath });
+      const totalErr = r.images.errors.length + r.rooms.errors.length;
       const lines = [
-        '✅ Esportazione completata',
+        totalErr === 0 ? '✅ Esportazione completata (set dati completo)' : `⚠️ Esportazione con ${totalErr} errori`,
         `📂 ${r.folderPath}`,
         '',
-        `⚙️  Config: ${r.configWritten ? 'OK' : 'skip'}`,
-        `🖼️  Immagini: ${r.images.copied} copiate, ${r.images.skipped} skip (errori: ${r.images.errors.length})`,
-        `🏰 Stanze: ${r.rooms.written} scritte (errori: ${r.rooms.errors.length})`
+        `⚙️  Libreria personaggi (config.json): ${r.configWritten ? '✅ scritta' : '⏭️  skip'}`,
+        `🖼️  Immagini: ${r.images.copied} copiate, ${r.images.skipped} gia\u0027 aggiornate (errori: ${r.images.errors.length})`,
+        `🏰 Stanze (incl. gameState): ${r.rooms.written} scritte (errori: ${r.rooms.errors.length})`,
+        `📋 manifest.json + README.md: aggiornati`,
+        '',
+        '👉 Su un altro PC: installa l\u0027app, vai in Configurazione → Importa,',
+        '   apri questa cartella e premi "Importa dalla cartella". Avrai tutto.'
       ];
       if (r.images.errors.length || r.rooms.errors.length) {
         lines.push('', '--- ERRORI ---');
@@ -239,18 +277,29 @@
     })[c]);
   }
 
-  // ----- Setup automatico (one-shot) -----
-  // Sfoglia (o usa il path attuale) -> POST /api/folder/setup -> crea struttura + salva.
+  // ----- Popola cartella di lavoro (one-shot) -----
+  // Apre il selettore con default sulla cartella dati del programma (userData),
+  // poi chiama POST /api/folder/setup che crea struttura + salva path + esporta.
   async function quickSetup() {
     let folderPath = $('folder-path-input').value.trim();
+
+    // Pre-fill suggerito = cartella dati programma (in Electron).
+    let suggestedDefault;
+    if (isElectron && window.electronAPI && window.electronAPI.getDataPath) {
+      try {
+        const dp = await window.electronAPI.getDataPath();
+        suggestedDefault = dp && dp.basePath;
+      } catch (_) {}
+    }
+
     if (isElectron) {
       try {
         const r = await window.electronAPI.pickFolder({
-          title: 'Scegli la cartella di lavoro (puoi puntarla dentro OneDrive/Drive)',
-          defaultPath: folderPath || undefined
+          title: 'Popola cartella di lavoro (puoi puntare anche dentro OneDrive/Drive)',
+          defaultPath: folderPath || suggestedDefault || undefined
         });
         if (r && !r.canceled && r.folderPath) folderPath = r.folderPath;
-        else if (!folderPath) return; // utente ha annullato e non c'era nulla
+        else return; // annullato
       } catch (e) {
         alert('Errore selettore: ' + e.message);
         return;
@@ -269,11 +318,22 @@
       const created = (data.structureCreated && data.structureCreated.created) || [];
       const exp = data.exportResult || {};
       const lines = [
-        '✅ Setup completato: ' + data.folderPath,
-        created.length ? `📁 ${created.length} sottocartelle create` : '📁 Struttura gia\u0027 esistente',
-        exp.rooms ? `📤 Esportate ${exp.rooms.written} stanze, ${exp.images.copied} immagini` : ''
+        '✅ Cartella pronta: ' + data.folderPath,
+        '',
+        created.length
+          ? `📁 ${created.length} sottocartelle create`
+          : '📁 Struttura gia\u0027 esistente, nessuna modifica',
+        exp.rooms
+          ? `📤 Esportate ${exp.rooms.written} stanze, ${exp.images.copied} immagini (skip ${exp.images.skipped})`
+          : '',
+        '',
+        '👉 Ora puoi droppare a mano altre immagini nelle sottocartelle:',
+        '   ' + data.folderPath + '\\images\\heroes',
+        '   ' + data.folderPath + '\\images\\enemies',
+        '   ' + data.folderPath + '\\images\\allies',
+        '   ' + data.folderPath + '\\images\\summons'
       ].filter(Boolean);
-      showResultModal('✨ Setup automatico', lines.join('\n'));
+      showResultModal('📁 Popola cartella di lavoro', lines.join('\n'));
       await refreshStatus();
     } catch (e) {
       setStatusLine('❌ Setup fallito: ' + e.message, '#ff6b6b');

@@ -33,7 +33,7 @@
     try {
       const current = $('setup-path-input').value.trim();
       const r = await window.electronAPI.pickFolder({
-        title: 'Scegli la cartella di lavoro (puoi puntarla dentro OneDrive/Drive)',
+        title: 'Popola cartella di lavoro (default: cartella dati programma)',
         defaultPath: current || undefined
       });
       if (r && !r.canceled && r.folderPath) {
@@ -43,6 +43,19 @@
     } catch (e) {
       setStatus('err', 'Errore selettore cartella: ' + e.message);
     }
+  }
+
+  // Pre-fill input con la cartella dati programma (in Electron) cosi' l'utente
+  // sa subito qual e' il default e puo' confermare con un click.
+  async function prefillSuggestedPath() {
+    const input = $('setup-path-input');
+    if (!input || input.value.trim() || !isElectron) return;
+    try {
+      if (window.electronAPI && window.electronAPI.getDataPath) {
+        const dp = await window.electronAPI.getDataPath();
+        if (dp && dp.basePath) input.value = dp.basePath;
+      }
+    } catch (_) {}
   }
 
   async function confirm() {
@@ -99,6 +112,7 @@
         if (isElectron) {
           $('setup-browse-btn').style.display = '';
         }
+        await prefillSuggestedPath();
         show();
       }
     } catch (e) {

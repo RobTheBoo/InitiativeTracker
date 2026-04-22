@@ -192,11 +192,14 @@ async function exportFolder(folderPath, deps) {
 // ========== IMPORT ==========
 
 /**
- * Analizza la cartella e restituisce un piano di import (con conflitti).
- * NON applica niente.
+ * Analizza la cartella e restituisce un piano di import (con conflitti) +
+ * validazione strutturale: warnings (cose mancanti / sospette) e
+ * blockers (errori che impediscono l'import).
  *
  * Returns: {
- *   manifest, hasConfig, imageCount, rooms: [{id, name, exists, action}]
+ *   folderPath, manifest, hasConfig, imageCount, configCounts,
+ *   rooms: [{id, name, exists, action, hasGameState}],
+ *   warnings: [string], blockers: [string], canImport: bool
  * }
  */
 function analyzeImport(folderPath, deps) {
@@ -208,37 +211,96 @@ function analyzeImport(folderPath, deps) {
   const out = {
     folderPath,
     manifest,
-    hasConfig: fs.existsSync(path.join(folderPath, 'config.json')),
+    hasConfig: false,
+    configCounts: null,
     imageCount: 0,
-    rooms: []
+    imagesPerSub: {},
+    rooms: [],
+    warnings: [],
+    blockers: [],
+    canImport: true
   };
 
-  for (const sub of SUBFOLDERS) {
-    const dir = path.join(folderPath, 'images', sub);
-    if (!fs.existsSync(dir)) continue;
-    out.imageCount += fs.readdirSync(dir).filter(f => IMAGE_EXTS.includes(path.extname(f).toLowerCase())).length;
+  // 1. Manifest sanity
+  if (!manifest) {
+    out.warnings.push('manifest.json assente: la cartella non sembra un export RPG-Tracker. Procedi con cautela.');
+  } else {
+    if (manifest.version && manifest.version > MANIFEST_VERSION) {
+      out.blockers.push(`manifest.json versione ${manifest.version} > supportata ${MANIFEST_VERSION}. Aggiorna l\'app.`);
+    }
+    if (manifest.appName && manifest.appName !== 'RPG Initiative Tracker') {
+      out.warnings.push(`manifest.appName = "${manifest.appName}" (atteso "RPG Initiative Tracker").`);
+    }
   }
 
+  // 2. config.json
+  const configPath = path.join(folderPath, 'config.json');
+  out.hasConfig = fs.existsSync(configPath);
+  if (out.hasConfig) {
+    try {
+      const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      out.configCounts = {
+        heroes: Array.isArray(cfg.heroes) ? cfg.heroes.length : 0,
+        enemies: Array.isArray(cfg.enemies) ? cfg.enemies.length : 0,
+        allies: Array.isArray(cfg.allies) ? cfg.allies.length : 0,
+        summons: Array.isArray(cfg.summons) ? cfg.summons.length : 0,
+        effects: Array.isArray(cfg.effects) ? cfg.effects.length : 0
+      };
+    } catch (e) {
+      out.blockers.push('config.json presente ma JSON invalido: ' + e.message);
+    }
+  } else {
+    out.warnings.push('config.json assente: nessuna libreria personaggi verra\' importata.');
+  }
+
+  // 3. immagini
+  for (const sub of SUBFOLDERS) {
+    const dir = path.join(folderPath, 'images', sub);
+    if (!fs.existsSync(dir)) {
+      out.imagesPerSub[sub] = 0;
+      continue;
+    }
+    const n = fs.readdirSync(dir).filter(f => IMAGE_EXTS.includes(path.extname(f).toLowerCase())).length;
+    out.imagesPerSub[sub] = n;
+    out.imageCount += n;
+  }
+
+  // 4. rooms
   const roomsDir = path.join(folderPath, 'rooms');
-  if (fs.existsSync(roomsDir)) {
+  if (!fs.existsSync(roomsDir)) {
+    out.warnings.push('Cartella rooms/ assente: nessuna stanza verra\' importata.');
+  } else {
     const existingIds = new Set(db.getAllRooms().map(r => r.id));
+    let invalidRoomFiles = 0;
     for (const file of fs.readdirSync(roomsDir)) {
       if (!file.endsWith('.json')) continue;
       try {
         const payload = JSON.parse(fs.readFileSync(path.join(roomsDir, file), 'utf8'));
         const room = payload.room || {};
-        if (!room.id) continue;
+        if (!room.id) { invalidRoomFiles++; continue; }
         out.rooms.push({
           id: room.id,
           name: room.name || room.id,
           file,
           exists: existingIds.has(room.id),
+          hasGameState: !!payload.gameState,
           action: existingIds.has(room.id) ? 'ask' : 'create'
         });
-      } catch (_) {}
+      } catch (_) { invalidRoomFiles++; }
+    }
+    if (invalidRoomFiles) {
+      out.warnings.push(`${invalidRoomFiles} file rooms/*.json invalidi o senza room.id (verranno saltati).`);
+    }
+    if (out.rooms.length === 0) {
+      out.warnings.push('Nessuna stanza valida trovata in rooms/.');
     }
   }
 
+  if (!out.hasConfig && out.rooms.length === 0 && out.imageCount === 0) {
+    out.blockers.push('La cartella non contiene nulla di importabile (config + rooms + immagini tutti vuoti).');
+  }
+
+  out.canImport = out.blockers.length === 0;
   return out;
 }
 
