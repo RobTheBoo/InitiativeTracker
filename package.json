@@ -60,8 +60,7 @@
     "express": "^5.2.1",
     "multer": "^2.0.2",
     "qrcode": "^1.5.4",
-    "socket.io": "^4.8.3",
-    "socket.io-client": "^4.8.3"
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "@capacitor/android": "^6.0.0",
@@ -72,12 +71,18 @@
     "electron-rebuild": "^3.2.9",
     "pkg": "^5.8.1",
     "sharp": "^0.34.5",
+    "socket.io-client": "^4.8.3",
     "to-ico": "^1.1.5"
   },
   "scripts": {
     "open-firewall": "powershell -ExecutionPolicy Bypass -File scripts/open-firewall-port.ps1",
     "start": "node server.js",
     "dev": "electron .",
+    "test": "node scripts/test-electron-syntax.js && node scripts/test-client-id.js && node scripts/test-e2e-full.js && node scripts/test-cloud.js",
+    "test:syntax": "node scripts/test-electron-syntax.js",
+    "test:client-id": "node scripts/test-client-id.js",
+    "test:e2e": "node scripts/test-e2e-full.js",
+    "test:cloud": "node scripts/test-cloud.js",
     "build": "electron-builder",
     "build:win": "electron-builder --windows && npm run restore-data && npm run clean:win-unpacked",
     "restore-data": "node scripts/restore-data.js",

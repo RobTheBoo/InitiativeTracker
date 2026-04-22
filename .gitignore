@@ -14,6 +14,11 @@ win-unpacked/
 app-data/
 dist/app-data/
 
+# Cloud tokens (sensibili!)
+**/cloud-tokens-*.json
+**/cloud-tokens.json
+**/cloud.json
+
 # Electron
 *.log
 *.db

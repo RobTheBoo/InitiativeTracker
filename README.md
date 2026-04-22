@@ -114,16 +114,49 @@ rpg-initiative-tracker/
 └── server.js           # Thin wrapper per server headless (deploy/CLI)
 ```
 
-## OneDrive (opzionale)
+## Cloud Backup (opzionale): OneDrive + Google Drive
 
-Nella tab `☁️ Cloud` della Configurazione puoi:
-1. **Setup una-tantum**: registra una "App registration" gratuita su Azure (5 click) e incolla qui il client ID
-2. **Connetti**: ti viene mostrato un codice da inserire su `microsoft.com/devicelogin` (anche dal telefono va bene)
-3. **Push**: carica tutte le immagini locali su OneDrive (cartella `Apps/RPG Initiative Tracker/`)
-4. **Sync**: scarica da OneDrive le immagini mancanti localmente (utile su un nuovo PC)
-5. Da quel momento, **ogni nuovo upload** di immagine va automaticamente anche su OneDrive (best-effort, non blocca il salvataggio locale)
+Nella tab `☁️ Cloud` della Configurazione puoi connettere **OneDrive Personale** e/o **Google Drive**. Puoi connettere entrambi: l'upload va in automatico su tutti i provider attivi.
 
-> **Importante**: il database SQLite e `config.json` restano locali, mai su OneDrive (il sync di SQLite WAL può corromperlo). Solo le immagini vanno in cloud.
+### OneDrive (Microsoft account)
+1. **Setup Azure** (gratis, 1 minuto):
+   - Vai su [portal.azure.com](https://portal.azure.com) → App registrations → + New registration
+   - Account types: "Personal Microsoft accounts only" · Register
+   - Authentication → in fondo "Allow public client flows = Sì" · Save
+   - Copia "Application (client) ID"
+2. Incolla il client ID nella tab Cloud → Salva
+3. Click "🔐 Connetti": appare un codice da inserire su `microsoft.com/devicelogin` (puoi farlo anche dal telefono)
+
+### Google Drive (Google account)
+1. **Setup Google Cloud** (gratis, 2 minuti):
+   - Vai su [console.cloud.google.com](https://console.cloud.google.com) → crea progetto
+   - APIs & Services → Library → abilita **Google Drive API**
+   - APIs & Services → OAuth consent screen → External → aggiungi il tuo email come Test user
+   - APIs & Services → Credentials → + Create Credentials → OAuth client ID → **Desktop app**
+   - Copia il **Client ID** (NON serve il secret)
+2. Incolla nella tab Cloud → Salva
+3. Click "🔐 Connetti": si apre il browser sul consent screen Google, autorizzi, e il browser viene rediretto su `127.0.0.1:<porta>` (loopback automatico). Niente codici da copiare.
+
+Lo scope usato è `drive.file`: l'app vede SOLO i file che ha creato lei in `RPG Initiative Tracker/`, non tutto il tuo Drive.
+
+### Cosa succede dopo
+- **Push** carica tutte le immagini locali sul provider
+- **Sync** scarica dal provider le immagini mancanti localmente (utile su nuovo PC)
+- Ogni nuovo upload da Configurazione va automaticamente in entrambi i provider connessi (best-effort, fail-soft)
+
+> **Importante**: il database SQLite e `config.json` restano sempre locali, mai in cloud (il sync di SQLite WAL può corromperlo). Solo le immagini vanno in cloud.
+
+## Test
+
+```bash
+npm test                # syntax + clientId + e2e + cloud (richiede server avviato per gli ultimi 2)
+npm run test:syntax     # solo verifica statica
+npm run test:client-id  # solo riconnessione clientId
+npm run test:e2e        # partita completa simulata (master + 2 player + tablet)
+npm run test:cloud      # endpoint cloud multi-provider
+```
+
+Per i test E2E avvia prima il server in un altro terminale: `RPG_DATA_DIR=/tmp/rpg-test PORT=3099 node server.js`, poi `SERVER=http://localhost:3099 npm test`.
 
 ## Discovery sulla rete locale
 

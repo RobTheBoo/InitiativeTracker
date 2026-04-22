@@ -243,72 +243,106 @@
       </div>
     </div>
 
-    <!-- Tab Cloud / OneDrive -->
+    <!-- Tab Cloud (OneDrive + Google Drive) -->
     <div id="cloud-tab" class="config-content">
       <div class="config-section">
-        <h2>☁️ OneDrive Personale</h2>
+        <h2>☁️ Backup immagini in cloud</h2>
         <p style="color: var(--text-light); margin-bottom: 16px; line-height: 1.6;">
-          Carica le immagini di eroi, nemici, alleati ed evocazioni sul tuo OneDrive.
+          Carica le immagini di eroi, nemici, alleati ed evocazioni su <strong>OneDrive</strong> e/o <strong>Google Drive</strong>.
           Cosi' puoi cambiare PC, formattare, riavviare l'app e ritrovare tutte le immagini.
-          Il database SQLite resta locale (mai su OneDrive: si corromperebbe), solo le immagini vanno in cloud.
+          <br><strong>Il database SQLite resta sempre locale</strong> (su cloud si corromperebbe). Solo le immagini vanno in cloud.
+          <br>Puoi connettere entrambi i provider: l'upload va in automatico su tutti quelli connessi.
         </p>
 
-        <div id="cloud-status-card" style="background: var(--bg-dark); border: 1px solid var(--border-gold); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-          <div id="cloud-status-loading">Caricamento stato…</div>
-        </div>
+        <!-- Card per OneDrive -->
+        <div class="cloud-provider-card" data-provider="onedrive" style="background: var(--bg-dark); border: 1px solid var(--border-gold); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+          <h3 style="color: var(--accent-gold); margin-bottom: 12px;">☁️ OneDrive Personale</h3>
+          <div class="cloud-status-card" style="margin-bottom: 12px;">Caricamento…</div>
 
-        <!-- Setup Azure clientId (una-tantum) -->
-        <details id="cloud-setup-details" style="margin-bottom: 20px;">
-          <summary style="cursor: pointer; color: var(--accent-gold); font-weight: bold; padding: 8px 0;">
-            ⚙️ Setup iniziale (una-tantum) — Registra l'app Azure
-          </summary>
-          <div style="padding: 16px; background: var(--bg-dark); border-radius: 6px; margin-top: 8px;">
-            <p style="color: var(--text-light); line-height: 1.6;">
-              Microsoft richiede di registrare un'<strong>"app"</strong> nel tuo account Azure (gratis, 1 minuto).
-              E' come dare un nome al permesso che concedi: serve solo a tracciare chi puo' accedere ai tuoi file.
-            </p>
-            <ol style="color: var(--text-light); padding-left: 24px; margin: 12px 0; line-height: 1.8;">
-              <li>Vai su <a href="https://portal.azure.com" target="_blank" style="color: var(--accent-gold);">portal.azure.com</a> (login con il tuo Microsoft account)</li>
-              <li>Cerca <strong>"App registrations"</strong> in alto → clic <strong>+ New registration</strong></li>
-              <li>Nome: <code>RPG Tracker</code> (o quello che vuoi)</li>
-              <li>Account types: <strong>"Personal Microsoft accounts only"</strong></li>
-              <li>Redirect URI: lascia vuoto, clicca <strong>Register</strong></li>
-              <li>Vai a <strong>Authentication</strong> → in fondo: <strong>"Allow public client flows" = Sì</strong> → Save</li>
-              <li>Torna su <strong>Overview</strong>, copia il valore di <strong>"Application (client) ID"</strong></li>
-              <li>Incollalo qui sotto:</li>
-            </ol>
-            <div style="display: flex; gap: 8px; margin-top: 12px;">
-              <input type="text" id="cloud-client-id-input" placeholder="es. 12345678-1234-1234-1234-123456789abc" 
-                     style="flex: 1; padding: 10px; background: var(--bg-light); border: 1px solid var(--border-gold); border-radius: 4px; color: var(--text-light); font-family: 'Courier New', monospace;" />
-              <button class="btn primary" id="cloud-save-clientid-btn">Salva</button>
+          <details class="cloud-setup-details" style="margin-bottom: 12px;">
+            <summary style="cursor: pointer; color: var(--accent-gold); font-weight: bold; padding: 6px 0;">
+              ⚙️ Setup Azure (una-tantum, gratis, 1 minuto)
+            </summary>
+            <div style="padding: 12px; background: var(--bg-light); border-radius: 6px; margin-top: 6px;">
+              <ol style="color: var(--text-light); padding-left: 20px; line-height: 1.7; font-size: 0.9rem;">
+                <li>Vai su <a href="https://portal.azure.com" target="_blank" style="color: var(--accent-gold);">portal.azure.com</a> (login col tuo Microsoft account)</li>
+                <li>Cerca <strong>App registrations</strong> → <strong>+ New registration</strong></li>
+                <li>Nome: <code>RPG Tracker</code> · Account types: <strong>Personal Microsoft accounts only</strong> · Redirect URI vuoto · Register</li>
+                <li><strong>Authentication</strong> → in fondo <strong>"Allow public client flows" = Sì</strong> → Save</li>
+                <li>Overview → copia <strong>Application (client) ID</strong></li>
+              </ol>
+              <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <input type="text" class="cloud-client-id-input" placeholder="Application (client) ID di Azure" 
+                       style="flex: 1; padding: 8px; background: var(--bg-dark); border: 1px solid var(--border-gold); border-radius: 4px; color: var(--text-light); font-family: 'Courier New', monospace; font-size: 0.85rem;" />
+                <button class="btn primary cloud-save-clientid-btn">Salva</button>
+              </div>
             </div>
-          </div>
-        </details>
+          </details>
 
-        <!-- Pulsanti azione -->
-        <div id="cloud-actions" style="display: flex; gap: 10px; flex-wrap: wrap;">
-          <button class="btn primary" id="cloud-connect-btn" style="display:none;">🔐 Connetti OneDrive</button>
-          <button class="btn primary" id="cloud-sync-btn" style="display:none;">⬇️ Scarica da OneDrive</button>
-          <button class="btn secondary" id="cloud-push-btn" style="display:none;">⬆️ Carica tutto su OneDrive</button>
-          <button class="btn danger" id="cloud-disconnect-btn" style="display:none;">⛔ Disconnetti</button>
+          <div class="cloud-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn primary cloud-connect-btn" style="display:none;">🔐 Connetti</button>
+            <button class="btn primary cloud-sync-btn" style="display:none;">⬇️ Scarica</button>
+            <button class="btn secondary cloud-push-btn" style="display:none;">⬆️ Carica tutto</button>
+            <button class="btn danger cloud-disconnect-btn" style="display:none;">⛔ Disconnetti</button>
+          </div>
         </div>
 
-        <!-- Modal per device code -->
+        <!-- Card per Google Drive -->
+        <div class="cloud-provider-card" data-provider="gdrive" style="background: var(--bg-dark); border: 1px solid var(--border-gold); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+          <h3 style="color: var(--accent-gold); margin-bottom: 12px;">📂 Google Drive</h3>
+          <div class="cloud-status-card" style="margin-bottom: 12px;">Caricamento…</div>
+
+          <details class="cloud-setup-details" style="margin-bottom: 12px;">
+            <summary style="cursor: pointer; color: var(--accent-gold); font-weight: bold; padding: 6px 0;">
+              ⚙️ Setup Google Cloud (una-tantum, gratis, 2 minuti)
+            </summary>
+            <div style="padding: 12px; background: var(--bg-light); border-radius: 6px; margin-top: 6px;">
+              <ol style="color: var(--text-light); padding-left: 20px; line-height: 1.7; font-size: 0.9rem;">
+                <li>Vai su <a href="https://console.cloud.google.com" target="_blank" style="color: var(--accent-gold);">console.cloud.google.com</a> (login col tuo Google account)</li>
+                <li>Crea un nuovo progetto (es. "RPG Tracker") → Select project</li>
+                <li><strong>APIs &amp; Services → Library</strong> → cerca <strong>Google Drive API</strong> → <strong>Enable</strong></li>
+                <li><strong>APIs &amp; Services → OAuth consent screen</strong> → User Type <strong>External</strong> → compila i campi obbligatori → in <strong>Test users</strong> aggiungi il tuo email</li>
+                <li><strong>APIs &amp; Services → Credentials</strong> → <strong>+ Create Credentials → OAuth client ID</strong></li>
+                <li>Application type: <strong>Desktop app</strong> · Name: <code>RPG Tracker</code> → Create</li>
+                <li>Copia il <strong>Client ID</strong> (NON serve il client secret)</li>
+              </ol>
+              <p style="color: var(--text-dim); font-size: 0.8rem; margin-top: 8px;">
+                Lo scope usato e' <code>drive.file</code>: l'app vede SOLO i file che ha creato lei, non tutto il tuo Drive.
+              </p>
+              <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <input type="text" class="cloud-client-id-input" placeholder="Client ID Google (xxxxx.apps.googleusercontent.com)" 
+                       style="flex: 1; padding: 8px; background: var(--bg-dark); border: 1px solid var(--border-gold); border-radius: 4px; color: var(--text-light); font-family: 'Courier New', monospace; font-size: 0.85rem;" />
+                <button class="btn primary cloud-save-clientid-btn">Salva</button>
+              </div>
+            </div>
+          </details>
+
+          <div class="cloud-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn primary cloud-connect-btn" style="display:none;">🔐 Connetti</button>
+            <button class="btn primary cloud-sync-btn" style="display:none;">⬇️ Scarica</button>
+            <button class="btn secondary cloud-push-btn" style="display:none;">⬆️ Carica tutto</button>
+            <button class="btn danger cloud-disconnect-btn" style="display:none;">⛔ Disconnetti</button>
+          </div>
+        </div>
+
+        <!-- Modal auth (condiviso, riusato) -->
         <div id="cloud-auth-modal" class="modal" style="display: none;">
-          <div class="modal-content" style="max-width: 520px;">
-            <h3>🔐 Connetti OneDrive</h3>
-            <p style="color: var(--text-light); margin-bottom: 16px;">
-              Apri questo URL in un browser (anche dal telefono va bene):
+          <div class="modal-content" style="max-width: 560px;">
+            <h3 id="cloud-auth-title">🔐 Connessione…</h3>
+            <p style="color: var(--text-light); margin-bottom: 12px;" id="cloud-auth-intro">
+              Apri questo URL nel browser:
             </p>
             <div style="text-align: center; margin: 16px 0;">
               <a id="cloud-auth-uri" href="#" target="_blank" 
-                 style="font-size: 1.2rem; color: var(--accent-gold); text-decoration: underline;">
-                microsoft.com/devicelogin
+                 style="font-size: 1.05rem; color: var(--accent-gold); text-decoration: underline; word-break: break-all;">
+                …
               </a>
             </div>
-            <p style="color: var(--text-light); margin-bottom: 8px;">E inserisci questo codice:</p>
-            <div id="cloud-auth-code" style="font-family: 'Courier New', monospace; font-size: 2rem; text-align: center; background: var(--bg-light); padding: 16px; border-radius: 6px; letter-spacing: 4px; color: var(--accent-gold); border: 2px dashed var(--border-gold);">
-              ……………
+            <div id="cloud-auth-code-wrap" style="display: none;">
+              <p style="color: var(--text-light); margin-bottom: 8px;">E inserisci questo codice:</p>
+              <div id="cloud-auth-code" style="font-family: 'Courier New', monospace; font-size: 2rem; text-align: center; background: var(--bg-light); padding: 16px; border-radius: 6px; letter-spacing: 4px; color: var(--accent-gold); border: 2px dashed var(--border-gold);">
+                ……………
+              </div>
             </div>
             <p id="cloud-auth-status" style="margin-top: 16px; text-align: center; color: var(--text-light);">
               In attesa dell'autorizzazione…
@@ -319,10 +353,10 @@
           </div>
         </div>
 
-        <!-- Modal output sync -->
+        <!-- Modal risultato sync/push -->
         <div id="cloud-result-modal" class="modal" style="display: none;">
           <div class="modal-content" style="max-width: 600px;">
-            <h3 id="cloud-result-title">Sync completato</h3>
+            <h3 id="cloud-result-title">Operazione completata</h3>
             <pre id="cloud-result-body" style="background: var(--bg-light); padding: 12px; border-radius: 6px; max-height: 300px; overflow: auto; white-space: pre-wrap; color: var(--text-light); font-size: 0.85rem;"></pre>
             <div class="modal-buttons">
               <button class="btn primary" id="cloud-result-close-btn">OK</button>

@@ -1,77 +1,122 @@
-// Endpoint REST per la gestione di OneDrive e sync immagini.
-// Disegnato per essere "transparent": l'utente fa upload come oggi (POST multipart),
-// se OneDrive e' connesso il file va anche su cloud, se non lo e' funziona tutto come prima.
+// Endpoint REST per la gestione dei provider cloud (OneDrive, Google Drive).
+// Il design e' provider-agnostic: gli endpoint accettano ?provider=onedrive|gdrive,
+// l'utente puo' connettere entrambi indipendentemente.
+//
+// L'auto-push degli upload (pushSingleFile) carica su TUTTI i provider connessi.
+// Il sync (pull) viene fatto su un provider alla volta scelto dall'utente.
 
 const fs = require('fs');
 const path = require('path');
-const { OneDriveClient, FileTokenStore } = require('./onedrive');
+const crypto = require('crypto');
+const { OneDriveClient, FileTokenStore: OneDriveTokenStore } = require('./onedrive');
+const { GoogleDriveClient, FileTokenStore: GoogleTokenStore } = require('./google-drive');
 const { CloudConfigStore } = require('./cloud-config-store');
+
+const PROVIDERS = ['onedrive', 'gdrive'];
 
 function registerCloudRoutes(app, paths, configStore) {
   const cloudStore = new CloudConfigStore(paths.cloudConfigPath);
-  const tokenStore = new FileTokenStore(path.join(paths.dataDir, 'cloud-tokens.json'));
 
-  function getClient() {
+  const tokenStores = {
+    onedrive: new OneDriveTokenStore(path.join(paths.dataDir, 'cloud-tokens-onedrive.json')),
+    gdrive: new GoogleTokenStore(path.join(paths.dataDir, 'cloud-tokens-gdrive.json'))
+  };
+
+  // Manteniamo i client istanziati una volta sola: i loro flow di auth pending vivono in-memory
+  let clientCache = {};
+  function getClient(provider) {
+    if (clientCache[provider]) return clientCache[provider];
     const cfg = cloudStore.load();
-    return new OneDriveClient({
-      clientId: cfg.clientId || process.env.RPG_AZURE_CLIENT_ID || null,
-      tokenStore
-    });
+    const providerCfg = cfg.providers?.[provider] || {};
+    if (provider === 'onedrive') {
+      clientCache[provider] = new OneDriveClient({
+        clientId: providerCfg.clientId || process.env.RPG_AZURE_CLIENT_ID || null,
+        tokenStore: tokenStores[provider]
+      });
+    } else if (provider === 'gdrive') {
+      clientCache[provider] = new GoogleDriveClient({
+        clientId: providerCfg.clientId || process.env.RPG_GOOGLE_CLIENT_ID || null,
+        tokenStore: tokenStores[provider]
+      });
+    } else {
+      throw new Error('provider sconosciuto: ' + provider);
+    }
+    return clientCache[provider];
   }
 
-  // Stato sintetico per la UI
+  function invalidateClientCache(provider) {
+    delete clientCache[provider];
+  }
+
+  // ----- Stato globale di tutti i provider -----
   app.get('/api/cloud/status', async (req, res) => {
     const cfg = cloudStore.load();
-    const client = getClient();
-    const status = {
-      provider: 'onedrive',
-      configured: client.isConfigured(),
-      connected: client.isConnected(),
-      clientIdSource: cfg.clientId ? 'config' : (process.env.RPG_AZURE_CLIENT_ID ? 'env' : 'missing'),
+    const out = {
+      providers: {},
       lastSyncAt: cfg.lastSyncAt
     };
-    if (status.connected) {
-      try {
-        const me = await client.whoAmI();
-        status.account = { displayName: me.displayName, mail: me.mail || me.userPrincipalName };
-        const quota = await client.getDriveQuota();
-        if (quota) status.quota = { used: quota.used, total: quota.total, remaining: quota.remaining };
-      } catch (e) {
-        status.connectionError = e.message;
+    for (const p of PROVIDERS) {
+      const client = getClient(p);
+      const providerCfg = cfg.providers?.[p] || {};
+      const ps = {
+        configured: client.isConfigured(),
+        connected: client.isConnected(),
+        clientIdSource: providerCfg.clientId ? 'config' : (process.env[p === 'onedrive' ? 'RPG_AZURE_CLIENT_ID' : 'RPG_GOOGLE_CLIENT_ID'] ? 'env' : 'missing'),
+        lastSyncAt: cfg.providers?.[p]?.lastSyncAt || null
+      };
+      if (ps.connected) {
+        try {
+          const me = await client.whoAmI();
+          ps.account = me;
+          const q = (typeof client.getQuota === 'function') ? await client.getQuota() : (typeof client.getDriveQuota === 'function' ? await client.getDriveQuota() : null);
+          if (q) ps.quota = { used: q.used, total: q.total, remaining: q.remaining };
+        } catch (e) {
+          ps.connectionError = e.message;
+        }
       }
+      out.providers[p] = ps;
     }
-    res.json(status);
+    res.json(out);
   });
 
-  // Imposta il clientId Azure (azione una-tantum)
+  // Setup: salva clientId per un provider
   app.post('/api/cloud/config', (req, res) => {
-    const { clientId } = req.body || {};
+    const { provider, clientId } = req.body || {};
+    if (!PROVIDERS.includes(provider)) return res.status(400).json({ error: 'provider non valido' });
     if (typeof clientId !== 'string' || clientId.length < 8) return res.status(400).json({ error: 'clientId non valido' });
-    cloudStore.update(c => { c.clientId = clientId.trim(); return c; });
+    cloudStore.update(c => {
+      if (!c.providers) c.providers = {};
+      if (!c.providers[provider]) c.providers[provider] = {};
+      c.providers[provider].clientId = clientId.trim();
+      return c;
+    });
+    invalidateClientCache(provider);
     res.json({ success: true });
   });
 
-  // ----- Device code flow -----
-  // Ogni device-code ha il suo poll in-memory. Lo identifichiamo con session id.
-  const pendingFlows = new Map(); // sessionId -> { promise, status, deviceCode }
+  // ----- Auth flow (uniforme tra OneDrive e Google) -----
+  // Manteniamo le sessioni di flow per provider per non incrociare gli opaque sessionId
+  const pendingFlows = new Map(); // sessionId -> { provider, status, error, account, opaque }
 
   app.post('/api/cloud/auth/start', async (req, res) => {
+    const provider = req.body?.provider || req.query.provider;
+    if (!PROVIDERS.includes(provider)) return res.status(400).json({ error: 'provider non valido' });
     try {
-      const client = getClient();
-      if (!client.isConfigured()) return res.status(400).json({ error: 'clientId Azure non configurato' });
+      const client = getClient(provider);
+      if (!client.isConfigured()) return res.status(400).json({ error: `clientId ${provider} non configurato` });
       const dc = await client.startDeviceCode();
-      const sessionId = require('crypto').randomBytes(16).toString('hex');
-      const flow = { status: 'pending', error: null, account: null };
+      const sessionId = crypto.randomBytes(16).toString('hex');
+      const flow = { provider, status: 'pending', error: null, account: null, opaque: dc._opaque || dc.device_code };
       pendingFlows.set(sessionId, flow);
-      // Avvia poll in background
-      client.pollDeviceCode(dc.device_code, dc.interval, dc.expires_in)
+
+      // Polling in background
+      client.pollDeviceCode(flow.opaque, dc.interval, dc.expires_in)
         .then(async () => {
           flow.status = 'success';
           try {
             const me = await client.whoAmI();
-            flow.account = { displayName: me.displayName, mail: me.mail || me.userPrincipalName };
+            flow.account = me;
           } catch (_) {}
-          // Pulisci dopo 5 min
           setTimeout(() => pendingFlows.delete(sessionId), 5 * 60 * 1000);
         })
         .catch(err => {
@@ -79,12 +124,16 @@ function registerCloudRoutes(app, paths, configStore) {
           flow.error = err.message;
           setTimeout(() => pendingFlows.delete(sessionId), 5 * 60 * 1000);
         });
+
       res.json({
         sessionId,
-        userCode: dc.user_code,
-        verificationUri: dc.verification_uri,
+        provider,
+        userCode: dc.user_code || dc.userCode,
+        verificationUri: dc.verification_uri || dc.verificationUri || dc.authUrl,
         message: dc.message,
-        expiresIn: dc.expires_in
+        expiresIn: dc.expires_in,
+        // Per Google diamo anche l'authUrl direttamente cosi' possiamo aprirlo automaticamente
+        authUrl: dc.authUrl || null
       });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -94,27 +143,32 @@ function registerCloudRoutes(app, paths, configStore) {
   app.get('/api/cloud/auth/status/:sessionId', (req, res) => {
     const flow = pendingFlows.get(req.params.sessionId);
     if (!flow) return res.status(404).json({ error: 'sessione sconosciuta o scaduta' });
-    res.json(flow);
+    res.json({ status: flow.status, error: flow.error, account: flow.account, provider: flow.provider });
   });
 
   app.post('/api/cloud/auth/disconnect', async (req, res) => {
+    const provider = req.body?.provider || req.query.provider;
+    if (!PROVIDERS.includes(provider)) return res.status(400).json({ error: 'provider non valido' });
     try {
-      const client = getClient();
+      const client = getClient(provider);
       await client.disconnect();
+      invalidateClientCache(provider);
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  // ----- Sync: scarica da OneDrive le immagini mancanti localmente -----
+  // ----- Sync e Push (per provider specifico) -----
   app.post('/api/cloud/sync', async (req, res) => {
+    const provider = req.body?.provider || req.query.provider;
+    if (!PROVIDERS.includes(provider)) return res.status(400).json({ error: 'provider non valido' });
     try {
-      const client = getClient();
-      if (!client.isConnected()) return res.status(400).json({ error: 'OneDrive non connesso' });
+      const client = getClient(provider);
+      if (!client.isConnected()) return res.status(400).json({ error: `${provider} non connesso` });
 
       const subfolders = ['heroes', 'enemies', 'allies', 'summons'];
-      const result = { downloaded: [], skipped: [], errors: [] };
+      const result = { provider, downloaded: [], skipped: [], errors: [] };
 
       for (const sub of subfolders) {
         const remoteList = await client.listFolder(sub);
@@ -122,7 +176,7 @@ function registerCloudRoutes(app, paths, configStore) {
         for (const item of remoteList) {
           const localPath = path.join(localFolder, item.name);
           const cloudCfg = cloudStore.load();
-          const tracked = cloudCfg.remoteFiles[sub]?.[item.name];
+          const tracked = cloudCfg.remoteFiles?.[provider]?.[sub]?.[item.name];
           if (fs.existsSync(localPath) && tracked && tracked.etag === item.etag) {
             result.skipped.push(`${sub}/${item.name}`);
             continue;
@@ -131,8 +185,10 @@ function registerCloudRoutes(app, paths, configStore) {
             const buf = await client.downloadFile(item.id);
             fs.writeFileSync(localPath, buf);
             cloudStore.update(c => {
-              if (!c.remoteFiles[sub]) c.remoteFiles[sub] = {};
-              c.remoteFiles[sub][item.name] = { remoteId: item.id, etag: item.etag, lastSyncedAt: Date.now() };
+              if (!c.remoteFiles) c.remoteFiles = {};
+              if (!c.remoteFiles[provider]) c.remoteFiles[provider] = {};
+              if (!c.remoteFiles[provider][sub]) c.remoteFiles[provider][sub] = {};
+              c.remoteFiles[provider][sub][item.name] = { remoteId: item.id, etag: item.etag, lastSyncedAt: Date.now() };
               return c;
             });
             result.downloaded.push(`${sub}/${item.name}`);
@@ -141,20 +197,27 @@ function registerCloudRoutes(app, paths, configStore) {
           }
         }
       }
-      cloudStore.update(c => { c.lastSyncAt = Date.now(); return c; });
+      cloudStore.update(c => {
+        if (!c.providers) c.providers = {};
+        if (!c.providers[provider]) c.providers[provider] = {};
+        c.providers[provider].lastSyncAt = Date.now();
+        c.lastSyncAt = Date.now();
+        return c;
+      });
       res.json(result);
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  // ----- Push: carica TUTTE le immagini locali verso OneDrive (utile primo setup) -----
   app.post('/api/cloud/push', async (req, res) => {
+    const provider = req.body?.provider || req.query.provider;
+    if (!PROVIDERS.includes(provider)) return res.status(400).json({ error: 'provider non valido' });
     try {
-      const client = getClient();
-      if (!client.isConnected()) return res.status(400).json({ error: 'OneDrive non connesso' });
+      const client = getClient(provider);
+      if (!client.isConnected()) return res.status(400).json({ error: `${provider} non connesso` });
       const subfolders = ['heroes', 'enemies', 'allies', 'summons'];
-      const result = { uploaded: [], errors: [] };
+      const result = { provider, uploaded: [], errors: [] };
       for (const sub of subfolders) {
         const folder = paths.getImagesPath(sub);
         if (!fs.existsSync(folder)) continue;
@@ -165,8 +228,10 @@ function registerCloudRoutes(app, paths, configStore) {
             const buf = fs.readFileSync(local);
             const item = await client.uploadFile(sub, filename, buf, mimeForExt(path.extname(filename)));
             cloudStore.update(c => {
-              if (!c.remoteFiles[sub]) c.remoteFiles[sub] = {};
-              c.remoteFiles[sub][filename] = { remoteId: item.id, etag: item.eTag, lastSyncedAt: Date.now() };
+              if (!c.remoteFiles) c.remoteFiles = {};
+              if (!c.remoteFiles[provider]) c.remoteFiles[provider] = {};
+              if (!c.remoteFiles[provider][sub]) c.remoteFiles[provider][sub] = {};
+              c.remoteFiles[provider][sub][filename] = { remoteId: item.id, etag: item.eTag, lastSyncedAt: Date.now() };
               return c;
             });
             result.uploaded.push(`${sub}/${filename}`);
@@ -175,31 +240,44 @@ function registerCloudRoutes(app, paths, configStore) {
           }
         }
       }
-      cloudStore.update(c => { c.lastSyncAt = Date.now(); return c; });
+      cloudStore.update(c => {
+        if (!c.providers) c.providers = {};
+        if (!c.providers[provider]) c.providers[provider] = {};
+        c.providers[provider].lastSyncAt = Date.now();
+        c.lastSyncAt = Date.now();
+        return c;
+      });
       res.json(result);
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  // Hook per upload integrato: chiamato dalle route di upload esistenti.
-  // Se OneDrive e' connesso, carica anche su cloud (best-effort, fail-soft).
+  // Hook auto-upload: chiamato dalle route di upload immagini.
+  // Pusha verso TUTTI i provider connessi (best-effort, fail-soft).
   async function pushSingleFile(subfolder, filename, absolutePath) {
-    try {
-      const client = getClient();
-      if (!client.isConnected()) return null;
-      const buf = fs.readFileSync(absolutePath);
-      const item = await client.uploadFile(subfolder, filename, buf, mimeForExt(path.extname(filename)));
-      cloudStore.update(c => {
-        if (!c.remoteFiles[subfolder]) c.remoteFiles[subfolder] = {};
-        c.remoteFiles[subfolder][filename] = { remoteId: item.id, etag: item.eTag, lastSyncedAt: Date.now() };
-        return c;
-      });
-      return item;
-    } catch (e) {
-      console.warn(`⚠️  Push OneDrive fallito per ${subfolder}/${filename}:`, e.message);
-      return null;
+    const buf = fs.readFileSync(absolutePath);
+    const mime = mimeForExt(path.extname(filename));
+    const results = {};
+    for (const p of PROVIDERS) {
+      try {
+        const client = getClient(p);
+        if (!client.isConnected()) { results[p] = 'skipped (not connected)'; continue; }
+        const item = await client.uploadFile(subfolder, filename, buf, mime);
+        cloudStore.update(c => {
+          if (!c.remoteFiles) c.remoteFiles = {};
+          if (!c.remoteFiles[p]) c.remoteFiles[p] = {};
+          if (!c.remoteFiles[p][subfolder]) c.remoteFiles[p][subfolder] = {};
+          c.remoteFiles[p][subfolder][filename] = { remoteId: item.id, etag: item.eTag, lastSyncedAt: Date.now() };
+          return c;
+        });
+        results[p] = 'ok';
+      } catch (e) {
+        console.warn(`⚠️  Push ${p} fallito per ${subfolder}/${filename}:`, e.message);
+        results[p] = 'error: ' + e.message;
+      }
     }
+    return results;
   }
 
   return { cloudStore, getClient, pushSingleFile };

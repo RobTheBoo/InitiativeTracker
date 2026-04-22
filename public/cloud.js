@@ -1,200 +1,242 @@
-// UI per la tab "Cloud" della pagina configurazione.
-// Usa gli endpoint REST /api/cloud/* esposti da src/cloud/cloud-routes.js
+// UI per la tab "Cloud" della pagina configurazione: gestisce OneDrive E Google Drive.
+// Usa endpoint REST /api/cloud/* (provider-agnostic).
 
 (function() {
   let pollSession = null;
   let pollTimer = null;
+  let activeProvider = null;
 
-  function $(id) { return document.getElementById(id); }
+  const PROVIDER_LABELS = {
+    onedrive: 'OneDrive',
+    gdrive: 'Google Drive'
+  };
 
-  function show(el, display = 'block') { if (el) el.style.display = display; }
+  function $(s, root = document) { return root.querySelector(s); }
+  function $$(s, root = document) { return Array.from(root.querySelectorAll(s)); }
+  function show(el, d = 'inline-block') { if (el) el.style.display = d; }
   function hide(el) { if (el) el.style.display = 'none'; }
 
   function fmtBytes(n) {
     if (!n) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const u = ['B', 'KB', 'MB', 'GB', 'TB'];
     let i = 0;
-    while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
-    return n.toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return n.toFixed(i === 0 ? 0 : 1) + ' ' + u[i];
+  }
+
+  function getProviderCard(provider) {
+    return document.querySelector(`.cloud-provider-card[data-provider="${provider}"]`);
   }
 
   async function refreshStatus() {
-    const card = $('cloud-status-card');
-    if (!card) return;
-    card.innerHTML = '<div>Caricamento stato…</div>';
-
     try {
       const res = await fetch('/api/cloud/status');
-      const status = await res.json();
-
-      let html = '';
-      if (!status.configured) {
-        html = `
-          <div style="color: var(--accent-red);">
-            ❌ Azure clientId non configurato. Apri "Setup iniziale" qui sotto e segui i passi.
-          </div>`;
-        hide($('cloud-connect-btn'));
-        hide($('cloud-sync-btn'));
-        hide($('cloud-push-btn'));
-        hide($('cloud-disconnect-btn'));
-        const details = $('cloud-setup-details');
-        if (details) details.open = true;
-      } else if (!status.connected) {
-        html = `
-          <div style="color: var(--accent-gold);">
-            ⚙️ Azure clientId configurato.
-            <span style="color: var(--text-light); margin-left: 8px;">Connettiti con il tuo account Microsoft per iniziare.</span>
-          </div>`;
-        show($('cloud-connect-btn'), 'inline-block');
-        hide($('cloud-sync-btn'));
-        hide($('cloud-push-btn'));
-        hide($('cloud-disconnect-btn'));
-      } else {
-        const acct = status.account || {};
-        const q = status.quota || {};
-        html = `
-          <div style="color: #51cf66; font-weight: bold; margin-bottom: 6px;">✅ Connesso</div>
-          <div style="color: var(--text-light); margin-bottom: 4px;">
-            <strong>${acct.displayName || 'OneDrive'}</strong>
-            ${acct.mail ? '<span style="color: var(--text-dim);">(' + acct.mail + ')</span>' : ''}
-          </div>
-          ${q.total ? `<div style="color: var(--text-light); margin-top: 8px;">
-            Spazio: <strong>${fmtBytes(q.used)}</strong> / ${fmtBytes(q.total)} usati
-            <div style="background: var(--bg-light); height: 8px; border-radius: 4px; margin-top: 4px; overflow: hidden;">
-              <div style="background: var(--accent-gold); height: 100%; width: ${Math.min(100, (q.used/q.total)*100).toFixed(1)}%;"></div>
-            </div>
-          </div>` : ''}
-          ${status.lastSyncAt ? `<div style="color: var(--text-dim); margin-top: 8px; font-size: 0.85rem;">
-            Ultimo sync: ${new Date(status.lastSyncAt).toLocaleString('it-IT')}
-          </div>` : ''}
-          ${status.connectionError ? `<div style="color: var(--accent-red); margin-top: 8px;">⚠️ ${status.connectionError}</div>` : ''}
-        `;
-        hide($('cloud-connect-btn'));
-        show($('cloud-sync-btn'), 'inline-block');
-        show($('cloud-push-btn'), 'inline-block');
-        show($('cloud-disconnect-btn'), 'inline-block');
+      const data = await res.json();
+      for (const provider of Object.keys(data.providers || {})) {
+        renderProviderCard(provider, data.providers[provider]);
       }
-      card.innerHTML = html;
     } catch (e) {
-      card.innerHTML = `<div style="color: var(--accent-red);">Errore caricamento stato: ${e.message}</div>`;
+      console.error('cloud status err', e);
     }
   }
 
-  async function saveClientId() {
-    const inp = $('cloud-client-id-input');
-    const id = (inp.value || '').trim();
-    if (id.length < 8) { alert('clientId non valido'); return; }
+  function renderProviderCard(provider, status) {
+    const card = getProviderCard(provider);
+    if (!card) return;
+    const statusEl = $('.cloud-status-card', card);
+    const setupDetails = $('.cloud-setup-details', card);
+    const connectBtn = $('.cloud-connect-btn', card);
+    const syncBtn = $('.cloud-sync-btn', card);
+    const pushBtn = $('.cloud-push-btn', card);
+    const disconnectBtn = $('.cloud-disconnect-btn', card);
+
+    let html = '';
+    if (!status.configured) {
+      html = `<div style="color: var(--accent-red);">❌ Client ID non configurato. Apri "Setup" qui sotto per ottenerlo (gratis).</div>`;
+      hide(connectBtn); hide(syncBtn); hide(pushBtn); hide(disconnectBtn);
+      if (setupDetails) setupDetails.open = true;
+    } else if (!status.connected) {
+      html = `<div style="color: var(--accent-gold);">⚙️ Configurato. Clicca "Connetti" per autorizzare l'accesso.</div>`;
+      show(connectBtn); hide(syncBtn); hide(pushBtn); hide(disconnectBtn);
+    } else {
+      const acct = status.account || {};
+      const q = status.quota || {};
+      html = `
+        <div style="color: #51cf66; font-weight: bold; margin-bottom: 6px;">✅ Connesso</div>
+        <div style="color: var(--text-light);">
+          <strong>${escapeHtml(acct.displayName || PROVIDER_LABELS[provider])}</strong>
+          ${acct.mail ? `<span style="color: var(--text-dim); margin-left: 6px;">(${escapeHtml(acct.mail)})</span>` : ''}
+        </div>
+        ${q.total ? `<div style="color: var(--text-light); margin-top: 8px; font-size: 0.9rem;">
+          Spazio: <strong>${fmtBytes(q.used)}</strong> / ${fmtBytes(q.total)}
+          <div style="background: var(--bg-light); height: 6px; border-radius: 3px; margin-top: 4px; overflow: hidden;">
+            <div style="background: var(--accent-gold); height: 100%; width: ${Math.min(100, (q.used/q.total)*100).toFixed(1)}%;"></div>
+          </div>
+        </div>` : ''}
+        ${status.lastSyncAt ? `<div style="color: var(--text-dim); margin-top: 8px; font-size: 0.8rem;">Ultimo sync: ${new Date(status.lastSyncAt).toLocaleString('it-IT')}</div>` : ''}
+        ${status.connectionError ? `<div style="color: var(--accent-red); margin-top: 8px;">⚠️ ${escapeHtml(status.connectionError)}</div>` : ''}
+      `;
+      hide(connectBtn); show(syncBtn); show(pushBtn); show(disconnectBtn);
+    }
+    statusEl.innerHTML = html;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  }
+
+  async function saveClientId(provider, value) {
+    if (!value || value.length < 8) { alert('Client ID non valido'); return; }
     try {
       const res = await fetch('/api/cloud/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId: id })
+        body: JSON.stringify({ provider, clientId: value })
       });
       const out = await res.json();
       if (!res.ok) throw new Error(out.error || 'errore');
-      inp.value = '';
-      const details = $('cloud-setup-details');
-      if (details) details.open = false;
+      const card = getProviderCard(provider);
+      const inp = $('.cloud-client-id-input', card);
+      if (inp) inp.value = '';
+      const det = $('.cloud-setup-details', card);
+      if (det) det.open = false;
       await refreshStatus();
-      alert('✅ Salvato. Ora puoi cliccare "Connetti OneDrive".');
+      RPG_UI?.snackbar?.(`Client ID ${PROVIDER_LABELS[provider]} salvato`, 'success');
     } catch (e) {
       alert('Errore: ' + e.message);
     }
   }
 
-  async function startConnect() {
+  async function startConnect(provider) {
+    activeProvider = provider;
     try {
-      const res = await fetch('/api/cloud/auth/start', { method: 'POST' });
+      const res = await fetch('/api/cloud/auth/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider })
+      });
       const out = await res.json();
       if (!res.ok) throw new Error(out.error || 'errore');
       pollSession = out.sessionId;
-      $('cloud-auth-uri').href = out.verificationUri;
-      $('cloud-auth-uri').textContent = out.verificationUri.replace(/^https?:\/\//, '');
-      $('cloud-auth-code').textContent = out.userCode;
-      $('cloud-auth-status').textContent = 'In attesa dell\'autorizzazione… (codice valido per ' + Math.round(out.expiresIn / 60) + ' minuti)';
-      $('cloud-auth-modal').style.display = 'flex';
-      pollTimer = setInterval(pollAuthStatus, 3000);
+      $('#cloud-auth-title').textContent = `🔐 Connetti ${PROVIDER_LABELS[provider]}`;
+      $('#cloud-auth-uri').href = out.verificationUri;
+      $('#cloud-auth-uri').textContent = out.verificationUri;
+
+      // Per Google: niente codice da inserire (loopback automatico)
+      // Per OneDrive: mostriamo il device code
+      const codeWrap = $('#cloud-auth-code-wrap');
+      if (out.userCode && out.userCode !== '(apri il link)') {
+        codeWrap.style.display = 'block';
+        $('#cloud-auth-code').textContent = out.userCode;
+        $('#cloud-auth-intro').textContent = 'Apri questo URL nel browser e inserisci il codice qui sotto:';
+      } else {
+        codeWrap.style.display = 'none';
+        $('#cloud-auth-intro').textContent = 'Si aprirà la pagina di autorizzazione. Accetta i permessi per continuare. Il browser verrà rediretto automaticamente.';
+      }
+
+      $('#cloud-auth-status').textContent = `In attesa dell'autorizzazione… (valido per ${Math.round(out.expiresIn / 60)} min)`;
+      $('#cloud-auth-modal').style.display = 'flex';
+
+      // Tenta di aprire automaticamente il consent URL (per Google e' essenziale)
+      try { window.open(out.verificationUri, '_blank', 'noopener'); } catch (_) {}
+
+      pollTimer = setInterval(pollAuth, 2500);
     } catch (e) {
       alert('Errore avvio connessione: ' + e.message);
     }
   }
 
-  async function pollAuthStatus() {
+  async function pollAuth() {
     if (!pollSession) return;
     try {
       const res = await fetch('/api/cloud/auth/status/' + pollSession);
       const flow = await res.json();
       if (!res.ok) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-        $('cloud-auth-status').textContent = '❌ Sessione scaduta';
+        clearInterval(pollTimer); pollTimer = null;
+        $('#cloud-auth-status').textContent = '❌ Sessione scaduta';
         return;
       }
       if (flow.status === 'success') {
-        clearInterval(pollTimer);
-        pollTimer = null;
-        $('cloud-auth-status').textContent = '✅ Connesso! Chiudi questa finestra.';
+        clearInterval(pollTimer); pollTimer = null;
+        $('#cloud-auth-status').textContent = '✅ Connesso! Chiudi questa finestra.';
         setTimeout(() => {
-          $('cloud-auth-modal').style.display = 'none';
+          $('#cloud-auth-modal').style.display = 'none';
           refreshStatus();
-        }, 1500);
+          RPG_UI?.snackbar?.(`${PROVIDER_LABELS[activeProvider]} connesso`, 'success');
+        }, 1200);
       } else if (flow.status === 'error') {
-        clearInterval(pollTimer);
-        pollTimer = null;
-        $('cloud-auth-status').textContent = '❌ ' + (flow.error || 'errore');
+        clearInterval(pollTimer); pollTimer = null;
+        $('#cloud-auth-status').textContent = '❌ ' + (flow.error || 'errore');
       }
-    } catch (_) { /* network blip, riproveremo */ }
+    } catch (_) { /* network blip */ }
   }
 
   function cancelAuth() {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
     pollSession = null;
-    $('cloud-auth-modal').style.display = 'none';
+    activeProvider = null;
+    $('#cloud-auth-modal').style.display = 'none';
   }
 
-  async function doSync() {
-    const btn = $('cloud-sync-btn');
+  async function doSync(provider) {
+    const card = getProviderCard(provider);
+    const btn = $('.cloud-sync-btn', card);
     btn.disabled = true;
-    btn.textContent = '⏳ Sync in corso…';
+    const orig = btn.textContent;
+    btn.textContent = '⏳ Sync…';
     try {
-      const res = await fetch('/api/cloud/sync', { method: 'POST' });
+      const res = await fetch('/api/cloud/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider })
+      });
       const out = await res.json();
-      $('cloud-result-title').textContent = res.ok ? '⬇️ Sync completato' : '❌ Sync fallito';
-      $('cloud-result-body').textContent = JSON.stringify(out, null, 2);
-      $('cloud-result-modal').style.display = 'flex';
+      $('#cloud-result-title').textContent = res.ok ? `⬇️ Sync ${PROVIDER_LABELS[provider]}` : '❌ Sync fallito';
+      $('#cloud-result-body').textContent = JSON.stringify(out, null, 2);
+      $('#cloud-result-modal').style.display = 'flex';
       await refreshStatus();
     } catch (e) {
       alert('Errore: ' + e.message);
     } finally {
       btn.disabled = false;
-      btn.textContent = '⬇️ Scarica da OneDrive';
+      btn.textContent = orig;
     }
   }
 
-  async function doPush() {
-    if (!confirm('Carica TUTTE le immagini locali su OneDrive? Quelle gia' + String.fromCharCode(39) + ' presenti verranno sovrascritte.')) return;
-    const btn = $('cloud-push-btn');
+  async function doPush(provider) {
+    if (!confirm(`Carica TUTTE le immagini locali su ${PROVIDER_LABELS[provider]}? Quelle gia' presenti verranno sovrascritte.`)) return;
+    const card = getProviderCard(provider);
+    const btn = $('.cloud-push-btn', card);
     btn.disabled = true;
-    btn.textContent = '⏳ Upload in corso…';
+    const orig = btn.textContent;
+    btn.textContent = '⏳ Upload…';
     try {
-      const res = await fetch('/api/cloud/push', { method: 'POST' });
+      const res = await fetch('/api/cloud/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider })
+      });
       const out = await res.json();
-      $('cloud-result-title').textContent = res.ok ? '⬆️ Upload completato' : '❌ Upload fallito';
-      $('cloud-result-body').textContent = JSON.stringify(out, null, 2);
-      $('cloud-result-modal').style.display = 'flex';
+      $('#cloud-result-title').textContent = res.ok ? `⬆️ Upload ${PROVIDER_LABELS[provider]}` : '❌ Upload fallito';
+      $('#cloud-result-body').textContent = JSON.stringify(out, null, 2);
+      $('#cloud-result-modal').style.display = 'flex';
       await refreshStatus();
     } catch (e) {
       alert('Errore: ' + e.message);
     } finally {
       btn.disabled = false;
-      btn.textContent = '⬆️ Carica tutto su OneDrive';
+      btn.textContent = orig;
     }
   }
 
-  async function doDisconnect() {
-    if (!confirm('Disconnetti OneDrive? Le immagini locali resteranno, ma i nuovi upload non andranno piu in cloud.')) return;
+  async function doDisconnect(provider) {
+    if (!confirm(`Disconnetti ${PROVIDER_LABELS[provider]}? Le immagini locali resteranno.`)) return;
     try {
-      const res = await fetch('/api/cloud/auth/disconnect', { method: 'POST' });
+      const res = await fetch('/api/cloud/auth/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider })
+      });
       if (!res.ok) throw new Error((await res.json()).error || 'errore');
       await refreshStatus();
     } catch (e) {
@@ -203,35 +245,37 @@
   }
 
   function setupListeners() {
-    const map = {
-      'cloud-save-clientid-btn': saveClientId,
-      'cloud-connect-btn': startConnect,
-      'cloud-sync-btn': doSync,
-      'cloud-push-btn': doPush,
-      'cloud-disconnect-btn': doDisconnect,
-      'cloud-auth-cancel-btn': cancelAuth,
-      'cloud-result-close-btn': () => { $('cloud-result-modal').style.display = 'none'; }
-    };
-    for (const [id, fn] of Object.entries(map)) {
-      const el = document.getElementById(id);
-      if (el) el.addEventListener('click', fn);
-    }
+    // Per ogni card provider, aggancia i bottoni
+    $$('.cloud-provider-card').forEach(card => {
+      const provider = card.dataset.provider;
+      $('.cloud-save-clientid-btn', card)?.addEventListener('click', () => {
+        const inp = $('.cloud-client-id-input', card);
+        saveClientId(provider, (inp.value || '').trim());
+      });
+      $('.cloud-connect-btn', card)?.addEventListener('click', () => startConnect(provider));
+      $('.cloud-sync-btn', card)?.addEventListener('click', () => doSync(provider));
+      $('.cloud-push-btn', card)?.addEventListener('click', () => doPush(provider));
+      $('.cloud-disconnect-btn', card)?.addEventListener('click', () => doDisconnect(provider));
+    });
+
+    $('#cloud-auth-cancel-btn')?.addEventListener('click', cancelAuth);
+    $('#cloud-result-close-btn')?.addEventListener('click', () => {
+      $('#cloud-result-modal').style.display = 'none';
+    });
   }
 
-  // Inizializza quando si apre la tab Cloud
   function init() {
     setupListeners();
-    // Refresha solo se la tab e' attiva al load (oppure quando l'utente la apre)
-    const cloudTab = document.getElementById('cloud-tab');
-    if (cloudTab && cloudTab.classList.contains('active')) {
-      refreshStatus();
-    }
-    // Hook sui tab button per refreshare quando l'utente apre Cloud
+    // Refresha quando l'utente apre la tab Cloud
     document.querySelectorAll('.config-tab').forEach(btn => {
       btn.addEventListener('click', () => {
-        if (btn.dataset.tab === 'cloud') setTimeout(refreshStatus, 100);
+        if (btn.dataset.tab === 'cloud') setTimeout(refreshStatus, 50);
       });
     });
+    // Se la tab Cloud e' gia' attiva al load (es. arrivati da link diretto)
+    if (document.getElementById('cloud-tab')?.classList.contains('active')) {
+      refreshStatus();
+    }
   }
 
   if (document.readyState === 'loading') {
