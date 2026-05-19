@@ -110,6 +110,40 @@ Stima: 3-4 ore.
 
 **Totale: 7-10 ore di lavoro effettivo.**
 
-## Review
+## Review (2026-05-19)
 
-> Da compilare al termine.
+Tutti e 4 i blocchi completati e pushati su `origin/main` in 4 commit
+atomici:
+
+| Commit | Descrizione | Files | Test |
+|---|---|---|---|
+| `e82d03d` | Blocco B: bug visivi mobile (form wrap, round label, combat-bar overlap) | 2 | E2E 53/53 |
+| `7197729` | Blocco A: sblocca becomeMaster da qualunque client (auth primo arrivato) | 2 | E2E 53/53 + manuale browser non-Electron |
+| `6459596` | Blocco C: drag-and-drop initiative bar funziona su mobile (long-press 250ms) | 2 | E2E 53/53 |
+| `b22664d` | Blocco D: vista Master accessibile da APK Android via room-selector mobile | 4 | E2E 53/53 + manuale flow room-selector → master |
+
+Outcome:
+- Vista Master raggiungibile da APK / browser / Electron tutti via stesso
+  flusso. Auth "primo arrivato vince" (decisa il 2026-05-19).
+- APK rebuildato in `dist/RPG-Initiative-Tracker-debug.apk` (4225 KB,
+  gradle BUILD SUCCESSFUL in 21s).
+- Drag-and-drop initiative bar funziona ora su touch device con long-press
+  250ms + haptic feedback (navigator.vibrate).
+
+Skipped nel MVP (annotato per futuro):
+- C.2: il dropdown `<input list="effects-datalist">` su Android puo' coprire
+  i bottoni sotto. Il dropdown e' nativo, fix CSS-only non risolve.
+  Da valutare con select custom se l'usabilita' non basta in test reale.
+- Cooldown 30s per takeover Master dopo disconnect: skip MVP.
+- Versioning: APK resta debug + versionCode 1.0; bump quando si fa la
+  release stabile. Per uso domestico/LAN va bene cosi'.
+
+Tempo effettivo: ~2.5 ore (vs. stima 7-10h grazie al codebase gia' molto
+responsive e a room-selector.js gia' browser-aware).
+
+Prossimi step potenziali (NON nel MVP):
+- Test su device fisico Android per validare touch DnD reale.
+- Snackbar/toast invece di alert per "Master gia' connesso" (oggi mostra
+  schermata error con bottone Riprova - funzionale ma non slick).
+- Disabilitare il bottone "+ Master" se la stanza ha gia' un master
+  connesso (visualmente, NON come security gate).

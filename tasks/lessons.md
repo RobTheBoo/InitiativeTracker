@@ -268,3 +268,116 @@ HTTP interno:
 4. SEMPRE `dialog.showErrorBox` prima di `app.exit()` su errori fatali
    di startup, altrimenti il processo esce silenzioso e l'utente non
    capisce se ha cliccato bene.
+
+---
+
+## 2026-05-19 — HTML5 drag-and-drop NON funziona su touch device
+
+**Problema.** Le API `dragstart` / `dragover` / `drop` di HTML5 non scattano
+sul tocco di Android/iOS. Sulla initiative bar questo significa che il
+master da telefono NON puo' riordinare i pareggi di iniziativa.
+
+**Workaround.** Pattern long-press 250ms con touch events + cleanup robusto:
+
+```js
+let touchState = null;
+card.addEventListener('touchstart', (e) => {
+  if (e.touches.length !== 1) return;
+  const t = e.touches[0];
+  touchState = { startX: t.clientX, startY: t.clientY, active: false };
+  touchState.longPressTimer = setTimeout(() => {
+    if (!touchState) return;
+    touchState.active = true;
+    // ... popola dragState come dragstart ...
+    if (navigator.vibrate) try { navigator.vibrate(30); } catch (_) {}
+  }, 250);
+}, { passive: true });
+card.addEventListener('touchmove', (e) => {
+  if (!touchState) return;
+  if (!touchState.active) {
+    // se l'utente si muove >8px PRIMA del long-press → annulla, lascia scroll
+    const dx = Math.abs(e.touches[0].clientX - touchState.startX);
+    const dy = Math.abs(e.touches[0].clientY - touchState.startY);
+    if (dx > 8 || dy > 8) { clearTimeout(touchState.longPressTimer); touchState = null; }
+    return;
+  }
+  e.preventDefault();          // NON va da passive: false
+  const el = document.elementFromPoint(t.clientX, t.clientY);
+  // ... resto del dragover ...
+}, { passive: false });
+```
+
+**Pattern fondamentali:**
+1. Default `touch-action: manipulation` su elementi draggable, override
+   `touch-action: none` SOLO mentre `.dragging` e' attivo. Cosi' il tap
+   semplice resta normale, ma durante il drag il browser non scrolla.
+2. `touchmove` deve essere `{ passive: false }` per poter chiamare
+   `preventDefault()` (le API moderne richiedono passive esplicito).
+3. SEMPRE gestire `touchcancel` oltre a `touchend` (interruzioni tipo
+   chiamata in arrivo, swipe di sistema, etc.) per evitare stato sporco.
+4. SEMPRE clearTimeout sul `longPressTimer` in entrambi gli end e quando
+   l'utente si muove troppo, altrimenti il timer "scatta dopo" e cambia
+   stato in maniera inattesa.
+5. `navigator.vibrate(30)` come haptic feedback (Android) per dare
+   conferma all'utente che il long-press ha attivato il drag.
+
+---
+
+## 2026-05-19 — Capacitor APK: `window.location.origin` punta all'APK, non al server LAN
+
+**Problema.** Quando l'app gira come APK Android (Capacitor), gli asset
+HTML/CSS/JS vengono caricati dal filesystem dell'APK con scheme `http://`
+ma origin `localhost`. Significato concreto:
+- `window.location.origin` = `http://localhost` → fetch RELATIVI cadono
+  dentro l'APK e fanno 404 (non c'e' nessun server li').
+- Le pagine vedono se stesse come "stessa origine" anche se in realta'
+  vogliono parlare con il server LAN su `192.168.X.Y:3001`.
+
+Risultato: room-selector / master.html da APK non riescono a fare
+`fetch('/api/rooms')` perche' va all'APK.
+
+**Pattern corretto.** Tre livelli di server URL resolution:
+
+```js
+const isCapacitorApp = !!(window.Capacitor &&
+  typeof window.Capacitor.isNativePlatform === 'function' &&
+  window.Capacitor.isNativePlatform());
+
+let serverUrl = '';
+const params = new URLSearchParams(window.location.search);
+const fromUrl = params.get('server');
+if (fromUrl) {
+  // 1. Override esplicito via ?server=<URL> (es passato dal flow di onboarding)
+  serverUrl = decodeURIComponent(fromUrl);
+  try { localStorage.setItem('serverUrl', serverUrl); } catch (_) {}
+} else if (isCapacitorApp) {
+  // 2. APK: cerca in localStorage da sessione precedente
+  serverUrl = localStorage.getItem('serverUrl') || '';
+} else {
+  // 3. Browser/Electron: l'origin E' il server
+  serverUrl = window.location.origin;
+}
+
+function apiUrl(path) {
+  if (!serverUrl) return path;
+  if (serverUrl === window.location.origin) return path; // relativo
+  return serverUrl.replace(/\/$/, '') + path;            // assoluto
+}
+```
+
+**Pattern fondamentali:**
+1. SEMPRE rilevare Capacitor con `window.Capacitor.isNativePlatform()`.
+   `window.Capacitor` esiste anche in browser desktop senza essere "native"
+   se il bundle viene caricato — il check su isNativePlatform e' l'unico
+   affidabile.
+2. SEMPRE propagare `serverUrl` via query string `?server=<URL>` quando
+   si naviga tra pagine in APK. localStorage e' un fallback, non l'unico
+   canale: in alcune versioni di Capacitor cambia di scope tra view.
+3. MAI assumere che `window.location.origin` sia il server. Costruire un
+   helper `apiUrl(path)` ed usarlo OVUNQUE per fetch / socket.io / `<img src>`.
+4. Per le navigazioni interne (es bottone "← Torna alle Stanze") preservare
+   il `?server=...` nelle URL, altrimenti l'utente perde il context al primo
+   redirect.
+5. Quando una pagina arriva senza serverUrl noto in APK Capacitor (es deep
+   link diretto) NON fare fetch silenziosi che falliscono → mostrare un
+   prompt esplicito che porti l'utente a un onboarding (es vista giocatore).
