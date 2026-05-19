@@ -607,6 +607,97 @@ function attachInitiativeBarDnD(bar) {
       ids.splice(insertAt, 0, dragState.id);
       socket.emit('reorderTieGroup', { integer: dragState.integer, orderedIds: ids });
     });
+
+    // ---- Touch fallback: HTML5 drag-and-drop non funziona su mobile ----
+    // Long-press (250ms) su una card => entra in modalita' "trascinamento touch":
+    // touchmove muove il dito e illumina il target valido come dragover; touchend
+    // committa il drop o cancella. touchcancel pulisce sempre lo stato.
+    let touchState = null;
+    card.addEventListener('touchstart', (e) => {
+      // Solo single-touch e solo se la card e' draggable in questo render
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      touchState = {
+        startX: t.clientX,
+        startY: t.clientY,
+        active: false,
+        longPressTimer: null,
+        lastTarget: null
+      };
+      // Long-press: dopo 250ms sblocca la modalita' drag e impedisce lo scroll.
+      touchState.longPressTimer = setTimeout(() => {
+        if (!touchState) return;
+        touchState.active = true;
+        dragState = {
+          id: card.dataset.charId,
+          integer: parseInt(card.dataset.int, 10),
+          sourceEl: card
+        };
+        card.classList.add('dragging');
+        bar.querySelectorAll(`.turn-card.draggable[data-int="${dragState.integer}"]`)
+           .forEach(c => c.classList.add('valid-target'));
+        // haptic feedback se supportato (Android)
+        if (navigator.vibrate) try { navigator.vibrate(30); } catch (_) {}
+      }, 250);
+    }, { passive: true });
+
+    card.addEventListener('touchmove', (e) => {
+      if (!touchState) return;
+      const t = e.touches[0];
+      // Se l'utente si muove troppo prima del long-press, annulla il long-press
+      // e lascia che il browser gestisca il scroll come normale.
+      if (!touchState.active) {
+        const dx = Math.abs(t.clientX - touchState.startX);
+        const dy = Math.abs(t.clientY - touchState.startY);
+        if (dx > 8 || dy > 8) {
+          clearTimeout(touchState.longPressTimer);
+          touchState = null;
+        }
+        return;
+      }
+      // Modalita' drag attiva: previeni scroll del browser e calcola target.
+      e.preventDefault();
+      const el = document.elementFromPoint(t.clientX, t.clientY);
+      const targetCard = el && el.closest && el.closest('.turn-card.draggable');
+      // Pulisci hint vecchi
+      bar.querySelectorAll('.turn-card').forEach(c => c.classList.remove('drop-before', 'drop-after'));
+      if (targetCard && parseInt(targetCard.dataset.int, 10) === dragState.integer) {
+        const rect = targetCard.getBoundingClientRect();
+        const before = (t.clientX - rect.left) < rect.width / 2;
+        targetCard.classList.toggle('drop-before', before);
+        targetCard.classList.toggle('drop-after', !before);
+        touchState.lastTarget = { card: targetCard, before };
+      } else {
+        touchState.lastTarget = null;
+      }
+    }, { passive: false });
+
+    const endTouch = () => {
+      if (!touchState) return;
+      clearTimeout(touchState.longPressTimer);
+      const lt = touchState.lastTarget;
+      // Cleanup visuale
+      card.classList.remove('dragging');
+      bar.querySelectorAll('.turn-card').forEach(c => {
+        c.classList.remove('valid-target', 'drop-before', 'drop-after');
+      });
+      // Commit drop se abbiamo un target valido
+      if (touchState.active && dragState && lt && lt.card) {
+        const targetId = lt.card.dataset.charId;
+        if (targetId !== dragState.id) {
+          const groupCards = Array.from(bar.querySelectorAll(`.turn-card.draggable[data-int="${dragState.integer}"]`));
+          const ids = groupCards.map(c => c.dataset.charId).filter(id => id !== dragState.id);
+          const targetIdx = ids.indexOf(targetId);
+          const insertAt = lt.before ? targetIdx : targetIdx + 1;
+          ids.splice(insertAt, 0, dragState.id);
+          socket.emit('reorderTieGroup', { integer: dragState.integer, orderedIds: ids });
+        }
+      }
+      dragState = null;
+      touchState = null;
+    };
+    card.addEventListener('touchend', endTouch);
+    card.addEventListener('touchcancel', endTouch);
   });
 }
 

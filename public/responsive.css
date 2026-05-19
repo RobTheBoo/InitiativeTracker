@@ -135,6 +135,20 @@
   margin-top: 110px;
 }
 
+/* C.1 — Touch drag-and-drop sulla initiative-bar: il long-press handler in
+   master.js attiva il drag dopo 250ms; durante il drag impediamo lo scroll
+   nativo con touch-action none. Default su tutte le card draggable: lasciamo
+   `manipulation` cosi' tap singoli funzionano normali. */
+.turn-card.draggable {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.turn-card.draggable.dragging {
+  touch-action: none;
+}
+
 /* B.4 — Card eroe: la riga "add-effect-inline" (Nome | +/- | Rnd | +)
    e' troppo stretta a 375px. Wrappa in 2 righe: nome full-width sopra,
    sotto la riga +/- | Rnd | + . */
