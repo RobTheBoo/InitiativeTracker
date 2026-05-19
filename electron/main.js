@@ -9,13 +9,19 @@ const { getPrimaryLocalIP, getLocalIPs } = require('../src/server/paths');
 
 let mainWindow = null;
 let server = null;
-const PORT = parseInt(process.env.PORT || '3001', 10);
+
+// Porta preferita da env (compat) o 3001 di default. Se occupata proviamo i
+// successivi fino a MAX_PORT_ATTEMPTS. Il port effettivo bindato sta in
+// `actualPort` (usato da pageUrl per far puntare la finestra al server giusto).
+const PREFERRED_PORT = parseInt(process.env.PORT || '3001', 10);
+const MAX_PORT_ATTEMPTS = 10;
+let actualPort = PREFERRED_PORT;
 
 // URL base http:// del server interno: tutte le pagine vengono caricate via questo
 // URL invece che via file:// — cosi' fetch('/api/..') e <img src="/api/qr..">
 // si risolvono correttamente sull'Express server senza piu' bisogno di hack.
 function pageUrl(htmlFile) {
-  return `http://localhost:${PORT}/${htmlFile}`;
+  return `http://localhost:${actualPort}/${htmlFile}`;
 }
 
 function focusWindow() {
@@ -53,6 +59,28 @@ function createWindow() {
   // loadFile successivi (cambio pagina): rimettiamo focus sul renderer.
   mainWindow.webContents.on('did-finish-load', focusWindow);
 
+  // Safety net: se entro 8s non abbiamo mai visto ready-to-show (e.g. server
+  // down, DNS bloccato, loadURL in timeout) mostriamo comunque la finestra
+  // cosi' l'utente vede ALMENO l'error page invece di pensare che l'app sia
+  // rotta / non installata.
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      console.warn('⚠️ ready-to-show non arrivato dopo 8s: mostro la finestra comunque.');
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  }, 8000);
+
+  // Se il caricamento della pagina fallisce (server morto, porta sbagliata,
+  // ecc.) mostriamo una pagina di errore inline invece di una finestra vuota.
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    // -3 = ABORTED (es. redirect interno), lo ignoriamo.
+    if (errorCode === -3) return;
+    console.error(`❌ did-fail-load [${errorCode}] ${errorDescription} @ ${validatedURL}`);
+    mainWindow.loadURL(buildErrorPageDataUrl(errorCode, errorDescription, validatedURL));
+    if (!mainWindow.isVisible()) mainWindow.show();
+  });
+
   // CSP: permette connessioni a localhost e all'IP della rete locale
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
@@ -84,31 +112,90 @@ function createWindow() {
   });
 }
 
+function buildErrorPageDataUrl(code, description, url) {
+  const safe = (s) => String(s || '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+  const html = `<!DOCTYPE html>
+<html lang="it"><head><meta charset="utf-8"><title>Errore — RPG Initiative Tracker</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#1a1a2e;color:#e8e8f0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+  .wrap{max-width:640px;margin:10vh auto;padding:2rem;background:#23233a;
+    border-radius:12px;border:1px solid #3a3a5a;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+  h1{color:#f0c674;margin-top:0}
+  code{background:#0f0f1e;padding:2px 6px;border-radius:4px;color:#c5c5ff}
+  ul{line-height:1.8}
+  .btn{display:inline-block;margin-top:1rem;padding:.6rem 1.2rem;background:#f0c674;
+    color:#1a1a2e;border-radius:6px;text-decoration:none;font-weight:bold;cursor:pointer;border:none}
+</style></head>
+<body><div class="wrap">
+<h1>Impossibile avviare il server interno</h1>
+<p>RPG Initiative Tracker non è riuscito a caricare la sua pagina iniziale.</p>
+<p><strong>Dettagli tecnici:</strong><br>
+Codice: <code>${safe(code)}</code><br>
+Descrizione: <code>${safe(description)}</code><br>
+URL: <code>${safe(url)}</code></p>
+<p><strong>Cause più comuni:</strong></p>
+<ul>
+  <li>Un altro processo (spesso <code>node.exe</code> rimasto aperto da una sessione di sviluppo) sta usando la porta <code>${actualPort}</code>.</li>
+  <li>Un firewall o antivirus blocca <code>localhost</code>.</li>
+  <li>Una istanza zombie dell'app è rimasta viva in background.</li>
+</ul>
+<p><strong>Cosa fare:</strong></p>
+<ul>
+  <li>Apri il Task Manager e chiudi eventuali processi <em>Node.js</em> o <em>RPG Initiative Tracker</em>.</li>
+  <li>Da PowerShell (come admin): <code>Get-Process node, "RPG Initiative Tracker" | Stop-Process -Force</code></li>
+  <li>Riavvia l'applicazione.</li>
+</ul>
+<button class="btn" onclick="location.reload()">Riprova</button>
+</div></body></html>`;
+  return 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
+}
+
 async function startServer() {
   server = createServer({
-    port: PORT,
+    port: PREFERRED_PORT,
     host: '0.0.0.0',
     electronApp: app
   });
 
-  try {
-    const { port } = await server.listen(PORT, '0.0.0.0');
-    const localIP = getPrimaryLocalIP();
-    console.log(`✅ Server avviato: http://${localIP}:${port}`);
-    console.log(`✅ Server (loopback): http://localhost:${port}`);
-
-    if (mainWindow) {
-      mainWindow.webContents.send('server-started', { ip: localIP, port });
-    }
-  } catch (err) {
-    console.error('❌ ERRORE AVVIO SERVER:', err);
-    if (err.code === 'EADDRINUSE') {
-      console.error(`❌ Porta ${PORT} già in uso!`);
-    }
-    if (mainWindow) {
-      mainWindow.webContents.send('server-error', { error: err.message, code: err.code });
+  // Loop di retry su porte consecutive: se 3001 e' occupata proviamo 3002..3010
+  // cosi' l'app si apre comunque e l'utente non vede una finestra morta.
+  let lastErr = null;
+  for (let i = 0; i < MAX_PORT_ATTEMPTS; i++) {
+    const port = PREFERRED_PORT + i;
+    try {
+      const result = await server.listen(port, '0.0.0.0');
+      actualPort = result.port;
+      const localIP = getPrimaryLocalIP();
+      console.log(`✅ Server avviato: http://${localIP}:${actualPort}`);
+      console.log(`✅ Server (loopback): http://localhost:${actualPort}`);
+      if (actualPort !== PREFERRED_PORT) {
+        console.warn(`⚠️ Porta ${PREFERRED_PORT} era occupata, usata ${actualPort} come fallback.`);
+      }
+      if (mainWindow) {
+        mainWindow.webContents.send('server-started', { ip: localIP, port: actualPort });
+      }
+      return true;
+    } catch (err) {
+      lastErr = err;
+      if (err.code !== 'EADDRINUSE') break; // errore non-porta: fail-fast
+      console.warn(`⚠️ Porta ${port} occupata, provo la successiva...`);
+      // httpServer dopo un listen fallito va "rigenerato": re-creiamo tutta
+      // la factory (altrimenti il socket resta in stato di errore).
+      try { await server.close(); } catch (_) {}
+      server = createServer({ port: PREFERRED_PORT, host: '0.0.0.0', electronApp: app });
     }
   }
+
+  // Se siamo qui tutte le porte erano occupate (o c'e' stato un altro errore).
+  console.error('❌ ERRORE AVVIO SERVER:', lastErr);
+  const msg = lastErr && lastErr.code === 'EADDRINUSE'
+    ? `Tutte le porte da ${PREFERRED_PORT} a ${PREFERRED_PORT + MAX_PORT_ATTEMPTS - 1} sono occupate.\n\nProbabilmente un processo node.exe è rimasto acceso in background (spesso da una sessione di sviluppo).\n\nApri il Task Manager, chiudi tutti i processi "Node.js" e "RPG Initiative Tracker", poi riavvia l'applicazione.`
+    : `Errore inaspettato: ${lastErr ? lastErr.message : 'sconosciuto'}`;
+  dialog.showErrorBox('RPG Initiative Tracker — Impossibile avviare', msg);
+  return false; // caller: non creare la finestra, basta quittare
 }
 
 function setupIPCHandlers() {
@@ -137,7 +224,7 @@ function setupIPCHandlers() {
   });
 
   ipcMain.handle('get-server-ip', async () => {
-    return { ip: getPrimaryLocalIP(), ips: getLocalIPs(), port: PORT };
+    return { ip: getPrimaryLocalIP(), ips: getLocalIPs(), port: actualPort };
   });
 
   ipcMain.handle('get-data-path', async () => {
@@ -187,7 +274,12 @@ function setupIPCHandlers() {
 
 app.whenReady().then(async () => {
   // Server PRIMA della finestra: dobbiamo poter loadURL su http://localhost:PORT.
-  await startServer();
+  const ok = await startServer();
+  if (!ok) {
+    // startServer() ha gia' mostrato un dialog. Esci subito senza finestra.
+    app.exit(1);
+    return;
+  }
   setupIPCHandlers();
   createWindow();
 
