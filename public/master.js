@@ -19,14 +19,30 @@ window.addEventListener('orientationchange', () => {
 });
 console.log('🔌 Inizializzazione socket...');
 
-// Determina l'URL del server
+// Determina l'URL del server.
+// Priorita': Electron > query param ?server= (APK) > localStorage > origin.
+// In APK Capacitor window.location.origin punta a http://localhost (dentro
+// l'APK), quindi il fetch al server LAN richiede serverUrl esplicito.
 let socketUrl = '';
+const isCapacitorApp = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
 if (window.electronAPI && window.electronAPI.isElectron) {
-  // In Electron, connettiti a localhost:3001 (server integrato)
   socketUrl = 'http://localhost:3001';
 } else {
-  // In browser, usa l'URL corrente
-  socketUrl = window.location.origin;
+  const params = new URLSearchParams(window.location.search);
+  const serverParam = params.get('server');
+  if (serverParam) {
+    socketUrl = decodeURIComponent(serverParam);
+    try { localStorage.setItem('serverUrl', socketUrl); } catch (_) {}
+  } else if (isCapacitorApp) {
+    try { socketUrl = localStorage.getItem('serverUrl') || ''; } catch (_) {}
+    if (!socketUrl) {
+      // APK senza serverUrl: torna alla vista giocatore (l'utente inserisce IP li').
+      console.warn('⚠️ APK Master senza serverUrl: redirect a /index.html');
+      window.location.href = '/index.html';
+    }
+  } else {
+    socketUrl = window.location.origin;
+  }
 }
 
 // clientId persistente: utile per il master per identificare la sessione anche dopo refresh
@@ -950,8 +966,12 @@ if (backBtn) {
       // In Electron, usa l'API
           await window.electronAPI.backToRooms();
     } else {
-      // In browser, naviga alla pagina room selector
-          window.location.href = '/room-selector.html';
+      // In browser/APK, naviga alla pagina room selector preservando serverUrl
+      // (necessario in APK Capacitor dove origin != server LAN)
+      const params = new URLSearchParams();
+      if (isCapacitorApp && socketUrl) params.set('server', socketUrl);
+      const qs = params.toString();
+      window.location.href = '/room-selector.html' + (qs ? '?' + qs : '');
         }
       } catch (error) {
         console.error('Errore nel tornare alle stanze:', error);

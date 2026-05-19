@@ -156,6 +156,28 @@ window.connectToServerHandler = async function(e) {
 //     funziona se il telefono supporta mDNS - molti lo fanno via NSD service)
 //  2. Se conosciamo il subnet del telefono via WebRTC (cosa rara), provarlo
 //  3. Lista di candidati comuni: IP gateway -> .1, .2, .254, ecc.
+// Apri room-selector.html come Master, propagando l'IP server inserito.
+// Caso d'uso: utente da APK/browser tap "🎭 Sono il Master" → vediamo le stanze
+// remote e possiamo creare/scegliere come master da telefono.
+// Usa il valore corrente del campo IP (hidden #server-ip-input) come server param.
+window.openAsMaster = function () {
+  const hidden = document.getElementById('server-ip-input');
+  let server = (hidden && hidden.value || '').trim();
+  if (!server) {
+    alert('⚠️ Inserisci prima l\'IP del server nei blocchi sopra.');
+    return;
+  }
+  // Normalizza in formato URL completo
+  if (!/^https?:\/\//i.test(server)) server = 'http://' + server;
+  // Verifica formato base IPv4:port — se invalido, blocca
+  if (!/^https?:\/\/[^\/]+:\d+$/.test(server)) {
+    alert('⚠️ IP non valido. Deve essere come 192.168.1.27:3001');
+    return;
+  }
+  const url = '/room-selector.html?server=' + encodeURIComponent(server);
+  window.location.href = url;
+};
+
 window.tryAutoDiscover = async function() {
   const ipInput = document.getElementById('server-ip-input');
   const statusDiv = document.getElementById('server-ip-status');

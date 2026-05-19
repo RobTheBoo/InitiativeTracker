@@ -1,9 +1,45 @@
 // Room Selector - Frontend
 let rooms = [];
 
-// Controlla l'ambiente: Electron o Browser
+// Controlla l'ambiente: Electron, Capacitor APK, o Browser standard
 const isElectron = typeof window !== 'undefined' && window.electronAPI && window.electronAPI.isElectron;
+const isCapacitorApp = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
 const isBrowser = !isElectron;
+
+// Server URL: in Electron e' implicito (localhost:3001 stesso processo).
+// In browser standard (PC, telefono via Chrome) e' window.location.origin.
+// In APK Capacitor il "?server=..." param viene passato da index.html quando
+// l'utente clicca "🎭 Sono il Master", oppure e' salvato in localStorage da
+// una sessione precedente. Senza serverUrl, l'APK non puo' fare fetch perche'
+// window.location.origin punta a http://localhost (dentro l'APK).
+let serverUrl = '';
+(function resolveServerUrl() {
+  // 1. Query param ?server=... (override esplicito da index.html)
+  const params = new URLSearchParams(window.location.search);
+  const serverParam = params.get('server');
+  if (serverParam) {
+    serverUrl = decodeURIComponent(serverParam);
+    try { localStorage.setItem('serverUrl', serverUrl); } catch (_) {}
+    return;
+  }
+  // 2. Capacitor APK: cerchiamo serverUrl salvato
+  if (isCapacitorApp) {
+    serverUrl = (function () { try { return localStorage.getItem('serverUrl') || ''; } catch (_) { return ''; } })();
+    return;
+  }
+  // 3. Browser standard / Electron: l'origin e' il server stesso
+  serverUrl = window.location.origin;
+})();
+console.log('🌐 room-selector serverUrl:', serverUrl || '(none)');
+
+// Costruisce un URL fetch verso il server (assoluto su Capacitor, relativo altrove).
+function apiUrl(path) {
+  if (!serverUrl) return path;
+  // Path-relativo (Electron / browser stesso origin): preserve
+  if (serverUrl === window.location.origin) return path;
+  // Capacitor / cross-origin: prefissa serverUrl
+  return serverUrl.replace(/\/$/, '') + path;
+}
 
 // Carica stanze all'avvio
 async function loadRooms() {
@@ -14,8 +50,13 @@ async function loadRooms() {
       rooms = await window.electronAPI.getRooms();
       console.log('✅ Stanze caricate:', rooms.length);
     } else {
-      // Browser normale: usa fetch diretto
-      const response = await fetch('/api/rooms');
+      // Browser/APK: fetch al server (assoluto in APK, relativo altrove)
+      if (isCapacitorApp && !serverUrl) {
+        // Nessun serverUrl noto: mostra prompt invece di errore.
+        showServerNeededPrompt();
+        return;
+      }
+      const response = await fetch(apiUrl('/api/rooms'));
       rooms = await response.json();
     }
     renderRooms();
@@ -23,6 +64,26 @@ async function loadRooms() {
     console.error('❌ Errore caricamento stanze:', error);
     const errorMsg = error.message || 'Errore sconosciuto';
     showServerError(`❌ Impossibile caricare le stanze.\n\nErrore: ${errorMsg}\n\nVerifica:\n1. IP server corretto\n2. Master avviato\n3. Stessa rete Wi-Fi`);
+  }
+}
+
+// Mostra prompt "manca serverUrl" (solo APK Capacitor senza ?server=).
+// Suggerisce di tornare alla vista giocatore per inserire l'IP server.
+function showServerNeededPrompt() {
+  const grid = document.getElementById('rooms-grid');
+  const empty = document.getElementById('empty-state');
+  if (empty) empty.style.display = 'none';
+  if (grid) {
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column: 1 / -1;">
+        <div class="empty-state-icon">📡</div>
+        <h3>Nessun server configurato</h3>
+        <p>Per usare l'app come Master serve l'IP del server.</p>
+        <p>Torna alla vista Giocatore, inserisci l'IP del server nei blocchi,
+        poi clicca "🎭 Sono il Master".</p>
+        <button class="btn primary" onclick="window.location.href='/index.html'">← Vai a Vista Giocatore</button>
+      </div>
+    `;
   }
 }
 
@@ -48,8 +109,12 @@ function renderRooms() {
       'completed': 'Completato'
     }[status] || 'In attesa';
 
+    // Entry-point della stanza: in Electron il "card click" apre come Master
+    // (default storico). Su browser/APK mobile mostriamo invece due bottoni
+    // espliciti "Master" e "Giocatore" per dare scelta a tablet/telefono.
+    const cardClickAttr = isElectron ? `onclick="openRoom('${room.id}')"` : '';
     return `
-      <div class="room-card" onclick="openRoom('${room.id}')">
+      <div class="room-card" ${cardClickAttr}>
         <div class="room-card-header">
           <div>
             <div class="room-name">${room.name}</div>
@@ -63,9 +128,13 @@ function renderRooms() {
           🎲 Round: ${room.current_round || 1}
         </div>
         <div class="room-actions" onclick="event.stopPropagation()">
-          <button class="btn small primary" onclick="openRoom('${room.id}')">
-            Apri
+          <button class="btn small primary" onclick="openRoomAsRole('${room.id}', 'master')" title="Entra come Master">
+            🎭 Master
           </button>
+          ${isElectron ? '' : `
+          <button class="btn small secondary" onclick="openRoomAsRole('${room.id}', 'player')" title="Entra come Giocatore">
+            ⚔️ Giocatore
+          </button>`}
           <button class="btn small danger" onclick="deleteRoom('${room.id}')">
             Elimina
           </button>
@@ -74,6 +143,24 @@ function renderRooms() {
     `;
   }).join('');
 }
+
+// Apri stanza nel ruolo richiesto (browser/APK).
+// Per "master" → /master.html?roomId=...&server=...
+// Per "player" → /index.html?roomId=...&server=... (NB: app.js legge roomId da localStorage in alcuni flow,
+//                ma /master.html?roomId=... e' sempre stato supportato; per player basta /index.html con
+//                serverUrl gia' salvato; usiamo ?server= per coerenza in caso di APK senza localStorage).
+window.openRoomAsRole = function (roomId, role) {
+  if (isElectron && window.electronAPI && window.electronAPI.openRoom) {
+    window.electronAPI.openRoom(roomId, role);
+    return;
+  }
+  const target = role === 'master' ? '/master.html' : '/index.html';
+  const params = new URLSearchParams();
+  if (roomId) params.set('roomId', roomId);
+  // In APK propaga serverUrl per le pagine successive
+  if (isCapacitorApp && serverUrl) params.set('server', serverUrl);
+  window.location.href = `${target}?${params.toString()}`;
+};
 
 // Crea nuova stanza
 async function createRoom() {
@@ -90,8 +177,7 @@ async function createRoom() {
       // Electron: usa le API
       await window.electronAPI.createRoom(name);
     } else {
-      // Browser normale: usa fetch diretto
-      await fetch('/api/rooms/create', {
+      await fetch(apiUrl('/api/rooms/create'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name })
@@ -132,8 +218,7 @@ async function deleteRoom(roomId) {
       // Electron: usa le API
       await window.electronAPI.deleteRoom(roomId);
     } else {
-      // Browser normale: usa fetch diretto
-      await fetch(`/api/rooms/${roomId}`, { method: 'DELETE' });
+      await fetch(apiUrl(`/api/rooms/${roomId}`), { method: 'DELETE' });
     }
 
     await loadRooms();
@@ -231,7 +316,7 @@ async function loadServerIP() {
   serverIpElement.textContent = 'http://localhost:3001';
 
   try {
-    const res = await fetch('/api/server-info', { signal: AbortSignal.timeout(5000) });
+    const res = await fetch(apiUrl('/api/server-info'), { signal: AbortSignal.timeout(5000) });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const info = await res.json();
 
