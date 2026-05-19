@@ -175,22 +175,12 @@ class RoomManager {
       return;
     }
 
-    // Verifica se il client è Electron (solo Electron può diventare master)
-    // Controlla se il socket ha una proprietà che indica che è Electron
-    // In alternativa, possiamo verificare se la richiesta viene da localhost
-    // Per ora, assumiamo che solo le connessioni da localhost possano diventare master
-    // (questo è un controllo di sicurezza base, ma non perfetto)
-    const isLocalhost = socket.handshake.address === '127.0.0.1' || 
-                       socket.handshake.address === '::1' ||
-                       socket.handshake.address === '::ffff:127.0.0.1' ||
-                       socket.handshake.headers.host?.includes('localhost') ||
-                       socket.handshake.headers.origin?.includes('localhost');
-    
-    if (!isLocalhost) {
-      console.warn(`Socket ${socket.id} ha tentato di diventare master da un client non Electron (${socket.handshake.address})`);
-      socket.emit('error', 'Solo il Master (applicazione Electron) può accedere alla vista Master. I giocatori devono usare la vista Giocatore.');
-      return;
-    }
+    // Auth Master = "primo arrivato vince" (decisa 2026-05-19): qualunque
+    // client (Electron, browser, APK Android) puo' diventare master se la
+    // stanza non ne ha gia' uno connesso. La protezione contro doppi master
+    // arriva dal check seguente (masterId !== null + socket ancora connesso).
+    // Storicamente qui c'era un filtro `isLocalhost` che bloccava APK/browser:
+    // rimosso per consentire l'uso del Master da telefono/tablet sulla LAN.
 
     // Verifica se c'è un master e se è ancora connesso
     if (activeRoom.gameState.masterId && activeRoom.gameState.masterId !== socket.id) {

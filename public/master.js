@@ -887,16 +887,13 @@ socket.on('error', (message) => {
 
 socket.on('connect', () => {
   console.log('✅ Connesso al server, richiedo ruolo Master...');
-  
-  // Verifica che siamo in Electron (solo Electron può diventare master)
-  if (!window.electronAPI || !window.electronAPI.isElectron) {
-    console.error('❌ Tentativo di diventare master da browser! Solo Electron può diventare master.');
-    alert('⚠️ Accesso negato!\n\nSolo l\'applicazione Master (Electron) può accedere alla vista Master.\n\nI giocatori devono usare la vista Giocatore (index.html).');
-    // Reindirizza alla vista giocatore
-    window.location.href = '/index.html';
-    return;
-  }
-  
+
+  // Auth "primo arrivato vince" (2026-05-19): qualunque client puo' diventare
+  // master se la stanza non ne ha gia' uno connesso. Server-side il check
+  // arriva da room-manager.js (verifica masterId + socket connesso).
+  // Se becomeMaster fallisce con "Master già connesso" lo gestiamo nel
+  // listener socket.on('error') piu' sotto (snackbar + redirect).
+
   // Se c'è un roomId nell'URL, entra nella stanza PRIMA di diventare master
   const urlParams = new URLSearchParams(window.location.search);
   const roomId = urlParams.get('roomId');
@@ -943,11 +940,39 @@ socket.on('connect', () => {
 // Gestisci errori dal server
 socket.on('error', (message) => {
   console.error('❌ Errore dal server:', message);
-  if (message.includes('Master') || message.includes('Electron')) {
-    alert(`⚠️ ${message}\n\nSe stai cercando di accedere come Master da browser, devi usare l'applicazione Electron.`);
+
+  // "Master già connesso" non e' piu' un errore Electron-only: capita ogni
+  // volta che un secondo client tenta becomeMaster. Mostriamo una UI con
+  // due CTA chiare (Riprova / Vai a Giocatore) invece di alert blocking.
+  if (typeof message === 'string' && /Master\s+gi[àa]\s+connesso/i.test(message)) {
+    showMasterTakenScreen();
+    return;
+  }
+
+  if (typeof message === 'string' && (message.includes('Master') || message.includes('Electron'))) {
+    alert(`⚠️ ${message}`);
     window.location.href = '/index.html';
   }
 });
+
+function showMasterTakenScreen() {
+  const errorScreen = document.getElementById('error-screen');
+  const masterPanel = document.getElementById('master-panel');
+  if (!errorScreen) return;
+  if (masterPanel) masterPanel.classList.remove('active');
+  errorScreen.classList.add('active');
+  // Aggiungiamo un bottone "Riprova" inline nel container error se non c'e'
+  const errorBox = errorScreen.querySelector('.error-message');
+  if (errorBox && !errorBox.querySelector('[data-retry-master]')) {
+    const retry = document.createElement('button');
+    retry.className = 'btn primary';
+    retry.dataset.retryMaster = '1';
+    retry.style.marginTop = '8px';
+    retry.textContent = '🔄 Riprova';
+    retry.onclick = () => location.reload();
+    errorBox.insertBefore(retry, errorBox.querySelector('a'));
+  }
+}
 
 socket.on('connect_error', (error) => {
   console.error('❌ Errore connessione socket:', error);
