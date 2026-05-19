@@ -22,8 +22,12 @@ allprojects {
         google()
         mavenCentral()
     }
-    // Build directory fuori da OneDrive per evitare blocchi file
-    buildDir = "C:/Users/ercole/AppData/Local/rpg-android-build/${project.name}"
+    // Build directory dentro dist/ del progetto.
+    // Nota: il progetto NON e' piu' in OneDrive (ora in C:\dev\InitiativeTracker)
+    // quindi i lock di OneDrive non sono piu' un problema. Tenere la build in
+    // dist/ tiene tutti gli artefatti (EXE + APK) nella stessa cartella.
+    // Path assoluto per evitare ambiguita' fra root e sub-project.
+    buildDir = new File(rootProject.projectDir, "../dist/android-build/${project.name}").canonicalFile
 }
 
 task clean(type: Delete) {
