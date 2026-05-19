@@ -37,6 +37,22 @@ window.connectToServerHandler = async function(e) {
     alert('⚠️ Inserisci l\'IP del server (es: 192.168.1.27:3001)');
     return;
   }
+
+  // Se la UI usa i blocchi IP, valida che gli ottetti 3 e 4 siano stati compilati.
+  // syncHidden() puo' produrre stringhe come "192.168..:3001" se l'utente non ha
+  // riempito i campi: la fetch fallirebbe con errore di rete confuso.
+  const ipv4WithPort = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}):(\d{1,5})$/;
+  const m = serverInput.match(ipv4WithPort);
+  if (m) {
+    const parts = [m[1], m[2], m[3], m[4]].map(s => parseInt(s, 10));
+    if (parts.some(n => isNaN(n) || n < 0 || n > 255)) {
+      alert('⚠️ Indirizzo IP non valido. Ogni ottetto deve essere fra 0 e 255.');
+      return;
+    }
+  } else if (/\.\./.test(serverInput) || /^\.|\.$|:$/.test(serverInput.split(':')[0])) {
+    alert('⚠️ Compila tutti gli ottetti dell\'IP (formato 192.168.X.Y:3001).');
+    return;
+  }
   
   // Mostra stato di connessione
   if (statusDiv) {
@@ -174,6 +190,11 @@ window.tryAutoDiscover = async function() {
       clearTimeout(t);
       if (res.ok) {
         if (ipInput) ipInput.value = cand;
+        // Se la UI usa i blocchi IP (index.html nuova versione), riempi anche
+        // i blocchi con il candidato trovato (solo se IPv4, altrimenti ignora).
+        if (typeof window.parseIpToBlocks === 'function') {
+          window.parseIpToBlocks(cand);
+        }
         if (statusDiv) statusDiv.innerHTML = `<span style="color:#51cf66;">✅ Trovato: ${cand}</span>`;
         if (debugContent) debugContent.textContent = '✅ Master trovato a ' + url + '\nClicca "Connetti" per procedere.';
         return cand;
@@ -1765,15 +1786,22 @@ function setupServerIPInput() {
   
   // Precompila usando l'IP della barra URL (utile in browser/desktop: evita di
   // doverlo riscrivere ogni volta). Su Capacitor (APK) non c'è una URL utile.
+  // Se la UI usa i blocchi IP (index.html nuova versione), riempi i blocchi solo
+  // se l'host della URL e' un IPv4 valido (evita 'localhost' nei blocchi).
   if (!isCapacitorApp) {
     try {
       const loc = window.location;
-      // Usiamo solo se non è file:// e l'host non è vuoto
       if (loc && loc.hostname) {
         const port = loc.port || '3001';
         const fromUrl = `${loc.hostname}:${port}`;
-        ipInput.value = fromUrl;
-        ipInput.placeholder = fromUrl;
+        if (typeof window.parseIpToBlocks === 'function') {
+          // Riempie i blocchi solo se IPv4 (es. quando giocatore apre 192.168.x.y/)
+          window.parseIpToBlocks(fromUrl);
+        } else {
+          // Fallback vecchio campo testo (non dovrebbe accadere con la UI nuova)
+          ipInput.value = fromUrl;
+          ipInput.placeholder = fromUrl;
+        }
         console.log('📝 IP precompilato dalla URL:', fromUrl);
       }
     } catch (e) {
@@ -1789,7 +1817,11 @@ function setupServerIPInput() {
     try {
       const url = new URL(saved);
       const displayValue = `${url.hostname}${url.port ? ':' + url.port : ':3001'}`;
-      ipInput.value = displayValue;
+      if (typeof window.parseIpToBlocks === 'function') {
+        window.parseIpToBlocks(displayValue);
+      } else {
+        ipInput.value = displayValue;
+      }
       console.log('📝 IP precompilato:', displayValue);
       if (statusDiv) {
         statusDiv.innerHTML = `<span style="color: #51cf66;">✅ Connesso a: ${saved}</span>`;

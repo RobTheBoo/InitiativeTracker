@@ -64,58 +64,42 @@
     <section id="room-selection" class="screen active">
       <h2>Seleziona una Stanza</h2>
 
-      <!-- Banner Connect-Helper: IP + QR per onboarding rapido del telefono.
-           Visibile solo finche' l'utente non entra in una stanza (perche' e' dentro
-           #room-selection, le altre .screen lo nascondono automaticamente). -->
-      <div id="connect-helper-banner" style="display:none; background: linear-gradient(180deg, rgba(212,175,55,0.10), rgba(212,175,55,0.04)); border: 1px solid rgba(212,175,55,0.35); border-radius: 14px; padding: 18px 20px; margin: 0 auto 20px; max-width: 720px; box-shadow: 0 8px 24px rgba(0,0,0,0.25);">
-        <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: center;">
-          <div style="flex: 1 1 240px; min-width: 240px; text-align: center;">
-            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase;">📡 I giocatori si connettono a</div>
-            <button type="button" id="connect-ip-display" title="Tocca per copiare"
-                    style="background: rgba(0,0,0,0.35); border: 1px solid rgba(212,175,55,0.4); border-radius: 10px; color: var(--accent-gold, #d4af37); font-family: 'Courier New', monospace; font-size: 1.25rem; font-weight: 700; padding: 10px 14px; cursor: pointer; width: 100%; max-width: 320px; touch-action: manipulation; word-break: break-all;">
-              http://localhost:3001
-            </button>
-            <div id="connect-ip-copied" style="font-size: 0.8rem; color: #51cf66; margin-top: 6px; min-height: 18px;"></div>
-            <div id="connect-ip-alt" style="margin-top: 4px; font-size: 0.78rem; color: var(--text-dim); font-family: 'Courier New', monospace;"></div>
-            <div style="margin-top: 8px; font-size: 0.78rem; color: var(--text-dim);">
-              Tocca per copiare. Su Android <code style="color: var(--accent-gold);">.local</code> potrebbe non risolvere — usa l'IP.
-            </div>
-          </div>
-          <div style="flex: 0 0 auto; text-align: center;">
-            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; letter-spacing: 0.5px; text-transform: uppercase;">📷 Inquadra col telefono</div>
-            <div style="background: var(--accent-gold, #d4af37); padding: 8px; border-radius: 12px; display: inline-block; line-height: 0;">
-              <img id="connect-qr-img" alt="QR per connettere il telefono" style="display: block; width: 160px; height: 160px; border-radius: 6px; background: #fff;" />
-            </div>
-            <div id="connect-qr-error" style="display:none; color: #ff6b6b; font-size: 0.78rem; margin-top: 6px;"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Campo IP Server - SEMPRE VISIBILE su mobile -->
+      <!-- Campo IP Server a blocchi - SEMPRE VISIBILE su mobile.
+           Formato: [192].[168].[].[]:[3001]
+           I primi due ottetti e la porta sono precompilati; l'utente compila solo
+           gli ultimi due ottetti (LAN). Il valore concatenato finisce nel hidden
+           input #server-ip-input cosi' tutta la logica esistente di app.js continua
+           a funzionare senza modifiche al protocollo. -->
       <div id="server-ip-section" style="background: var(--card-bg); padding: 20px; border-radius: 12px; margin-bottom: 30px; max-width: 500px; margin-left: auto; margin-right: auto;">
         <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px;">
           📡 <strong>IP del Master</strong>
         </div>
-        <div style="display: flex; gap: 10px; align-items: center;" 
-             onclick="var i=document.getElementById('server-ip-input');if(i&&event.target!==document.getElementById('connect-ip-btn'))i.focus();">
-          <input type="text" 
-                 id="server-ip-input" 
-                 class="room-name-input" 
-                 placeholder="rpg-tracker.local:3001 oppure 192.168.1.27:3001"
-                 style="flex: 1; font-size: 1rem; padding: 14px; min-height: 44px; -webkit-user-select: text; user-select: text;"
-                 tabindex="0"
-                 autocomplete="off">
-          <button type="button" id="connect-ip-btn" class="btn primary" style="white-space: nowrap; min-height: 44px; min-width: 120px; cursor: pointer; touch-action: manipulation;"
+
+        <div class="ip-blocks" role="group" aria-label="Indirizzo IP del Master">
+          <input type="text" id="ip-octet-1" class="ip-octet" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="192" autocomplete="off" aria-label="Primo ottetto">
+          <span class="ip-sep" aria-hidden="true">.</span>
+          <input type="text" id="ip-octet-2" class="ip-octet" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="168" autocomplete="off" aria-label="Secondo ottetto">
+          <span class="ip-sep" aria-hidden="true">.</span>
+          <input type="text" id="ip-octet-3" class="ip-octet" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="1" autocomplete="off" aria-label="Terzo ottetto">
+          <span class="ip-sep" aria-hidden="true">.</span>
+          <input type="text" id="ip-octet-4" class="ip-octet" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="100" autocomplete="off" aria-label="Quarto ottetto">
+          <span class="ip-sep" aria-hidden="true">:</span>
+          <input type="text" id="ip-port" class="ip-port" inputmode="numeric" pattern="[0-9]*" maxlength="5" value="3001" autocomplete="off" aria-label="Porta">
+        </div>
+        <!-- Hidden: contiene "host:port" e viene letto da connectToServerHandler in app.js -->
+        <input type="hidden" id="server-ip-input" value="192.168..:3001">
+
+        <div style="display: flex; gap: 10px; align-items: center; margin-top: 12px; justify-content: flex-end;">
+          <button type="button" id="connect-ip-btn" class="btn primary" style="white-space: nowrap; min-height: 44px; min-width: 140px; cursor: pointer; touch-action: manipulation;"
                   onclick="if(window.connectToServerHandler){event.preventDefault();event.stopPropagation();window.connectToServerHandler(event);}">
             🔌 Connetti
           </button>
         </div>
+
         <div id="server-ip-status" style="margin-top: 10px; font-size: 0.85rem; min-height: 20px;"></div>
         <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
           <button type="button" id="auto-discover-btn" class="btn secondary small" style="font-size: 0.85rem;"
                   onclick="if(window.tryAutoDiscover){event.preventDefault();window.tryAutoDiscover();}">🔍 Trova automaticamente</button>
-          <button type="button" id="scan-qr-btn" class="btn secondary small" style="font-size: 0.85rem; display:none;"
-                  onclick="if(window.openQrScanner){event.preventDefault();window.openQrScanner();}">📷 Scansiona QR</button>
         </div>
         <!-- Area Debug - SEMPRE VISIBILE -->
         <div id="debug-area" style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; font-size: 0.8rem; border: 1px solid rgba(255,255,255,0.1);">
@@ -123,6 +107,55 @@
           <div id="debug-content" style="font-family: monospace; white-space: pre-wrap; word-break: break-all; color: var(--text);">In attesa di connessione...</div>
         </div>
       </div>
+
+      <style>
+        .ip-blocks {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          flex-wrap: nowrap;
+        }
+        .ip-blocks .ip-octet,
+        .ip-blocks .ip-port {
+          font-family: 'Courier New', monospace;
+          font-size: 1.25rem;
+          font-weight: 700;
+          text-align: center;
+          padding: 10px 6px;
+          min-height: 48px;
+          background: rgba(0, 0, 0, 0.35);
+          border: 1px solid rgba(212, 175, 55, 0.4);
+          border-radius: 8px;
+          color: var(--accent-gold, #d4af37);
+          -webkit-user-select: text;
+          user-select: text;
+        }
+        .ip-blocks .ip-octet { width: 56px; }
+        .ip-blocks .ip-port  { width: 76px; }
+        .ip-blocks .ip-octet:focus,
+        .ip-blocks .ip-port:focus {
+          outline: none;
+          border-color: var(--accent-gold, #d4af37);
+          box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.25);
+        }
+        /* Disattiva spinner number anche se inputmode=numeric in alcuni browser */
+        .ip-blocks input::-webkit-outer-spin-button,
+        .ip-blocks input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .ip-blocks .ip-sep {
+          font-family: 'Courier New', monospace;
+          font-size: 1.4rem;
+          font-weight: 700;
+          color: var(--accent-gold, #d4af37);
+          opacity: 0.7;
+          line-height: 1;
+        }
+        @media (max-width: 380px) {
+          .ip-blocks { gap: 3px; }
+          .ip-blocks .ip-octet { width: 48px; font-size: 1.1rem; padding: 10px 4px; }
+          .ip-blocks .ip-port  { width: 64px; font-size: 1.1rem; padding: 10px 4px; }
+        }
+      </style>
       
       <div id="rooms-grid" class="character-grid" style="max-width: 800px; margin: 0 auto;">
         <!-- Generato da JavaScript -->
@@ -374,88 +407,102 @@
   <script src="app.js?v=5"></script>
   <script src="ui-enhancements.js"></script>
   <script>
-    // Connect-helper banner: mostra IP+QR del server di onboarding telefoni.
-    // Standalone (non dipende da app.js) per resilienza nelle WebView.
+    // Wiring dei blocchi IP: ogni cambio nei blocchi ricostruisce "host:port"
+    // dentro il hidden #server-ip-input, che e' quello che app.js legge gia'.
+    // Helpers globali: parseIpToBlocks() per riempire i blocchi da una stringa
+    // tipo "192.168.1.27:3001" (usato da app.js quando ripristina l'IP salvato
+    // o quando l'auto-discovery trova un host).
     (function () {
-      var banner = document.getElementById('connect-helper-banner');
-      if (!banner) return;
+      var oct = [
+        document.getElementById('ip-octet-1'),
+        document.getElementById('ip-octet-2'),
+        document.getElementById('ip-octet-3'),
+        document.getElementById('ip-octet-4')
+      ];
+      var port = document.getElementById('ip-port');
+      var hidden = document.getElementById('server-ip-input');
+      if (!hidden || oct.some(function (e) { return !e; }) || !port) return;
 
-      var ipBtn   = document.getElementById('connect-ip-display');
-      var ipAlt   = document.getElementById('connect-ip-alt');
-      var copied  = document.getElementById('connect-ip-copied');
-      var qrImg   = document.getElementById('connect-qr-img');
-      var qrErr   = document.getElementById('connect-qr-error');
-
-      function applyUrl(primaryUrl, altIps) {
-        if (ipBtn) ipBtn.textContent = primaryUrl;
-        if (qrImg) {
-          qrImg.onerror = function () {
-            if (qrErr) {
-              qrErr.style.display = 'block';
-              qrErr.textContent = 'QR non disponibile (verifica /api/qr).';
-            }
-          };
-          qrImg.src = '/api/qr?url=' + encodeURIComponent(primaryUrl) + '&size=320&_=' + Date.now();
-        }
-        if (ipAlt && Array.isArray(altIps) && altIps.length > 0) {
-          ipAlt.textContent = 'altri IP: ' + altIps.join('  ·  ');
-        }
-        banner.style.display = '';
+      function syncHidden() {
+        var host = oct.map(function (e) { return (e.value || '').trim(); }).join('.');
+        var p = (port.value || '').trim() || '3001';
+        hidden.value = host + ':' + p;
       }
 
-      // Click sull'IP -> copia negli appunti (con fallback per WebView vecchie)
-      if (ipBtn) {
-        ipBtn.addEventListener('click', function () {
-          var txt = ipBtn.textContent.trim();
-          var done = function () {
-            if (!copied) return;
-            copied.textContent = '✔ Copiato negli appunti';
-            setTimeout(function () { copied.textContent = ''; }, 1800);
-          };
-          try {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-              navigator.clipboard.writeText(txt).then(done).catch(legacyCopy);
-            } else { legacyCopy(); }
-          } catch (_) { legacyCopy(); }
-          function legacyCopy() {
-            var ta = document.createElement('textarea');
-            ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
-            document.body.appendChild(ta); ta.select();
-            try { document.execCommand('copy'); done(); } catch (_) {}
-            document.body.removeChild(ta);
+      // Auto-jump al blocco successivo quando il campo e' pieno (3 cifre o '.')
+      // e back-jump al precedente con backspace su campo vuoto.
+      function wireOctet(el, next, prev) {
+        el.addEventListener('input', function () {
+          // Solo cifre (rimuovi tutto il resto)
+          var clean = (el.value || '').replace(/[^0-9]/g, '');
+          if (clean !== el.value) el.value = clean;
+          if (clean.length >= 3 && next) {
+            next.focus();
+            try { next.select(); } catch (_) {}
           }
+          syncHidden();
+        });
+        el.addEventListener('keydown', function (e) {
+          if (e.key === '.' || e.key === ':' || e.key === 'Tab' && !e.shiftKey && next) {
+            if (e.key === '.' || e.key === ':') {
+              e.preventDefault();
+              if (next) { next.focus(); try { next.select(); } catch (_) {} }
+            }
+          } else if (e.key === 'Backspace' && !el.value && prev) {
+            e.preventDefault();
+            prev.focus();
+            try {
+              var len = (prev.value || '').length;
+              prev.setSelectionRange(len, len);
+            } catch (_) {}
+          }
+        });
+        el.addEventListener('focus', function () {
+          try { el.select(); } catch (_) {}
         });
       }
 
-      function loadInfo() {
-        var ctrl = ('AbortController' in window) ? new AbortController() : null;
-        var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, 4000) : null;
-        fetch('/api/server-info', ctrl ? { signal: ctrl.signal } : {})
-          .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-          .then(function (info) {
-            if (timer) clearTimeout(timer);
-            var primaryUrl = info.playerUrl || ('http://' + info.primaryIp + ':' + info.port + '/');
-            // info.ips e' [{name, address, score}, ...]: estrai address e scarta il primario
-            var alt = (info.ips || [])
-              .map(function (it) { return (it && typeof it === 'object') ? it.address : it; })
-              .filter(function (ip) { return ip && ip !== info.primaryIp; });
-            applyUrl(primaryUrl, alt);
-          })
-          .catch(function () {
-            if (timer) clearTimeout(timer);
-            // Fallback: usa l'origin corrente (funziona quando l'utente apre gia' /)
-            var origin = window.location.origin;
-            // Se siamo in file:// o capacitor:// (APK senza server raggiungibile), nascondi.
-            if (!/^https?:/i.test(origin)) { banner.style.display = 'none'; return; }
-            applyUrl(origin + '/', []);
-          });
-      }
+      wireOctet(oct[0], oct[1], null);
+      wireOctet(oct[1], oct[2], oct[0]);
+      wireOctet(oct[2], oct[3], oct[1]);
+      wireOctet(oct[3], port,   oct[2]);
+      // Port: solo cifre
+      port.addEventListener('input', function () {
+        var clean = (port.value || '').replace(/[^0-9]/g, '');
+        if (clean !== port.value) port.value = clean;
+        syncHidden();
+      });
+      port.addEventListener('focus', function () { try { port.select(); } catch (_) {} });
+      port.addEventListener('keydown', function (e) {
+        if (e.key === 'Backspace' && !port.value) {
+          e.preventDefault();
+          oct[3].focus();
+          try {
+            var len = (oct[3].value || '').length;
+            oct[3].setSelectionRange(len, len);
+          } catch (_) {}
+        }
+      });
 
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', loadInfo);
-      } else {
-        loadInfo();
-      }
+      // Esposto a app.js per ripopolare i blocchi da una stringa salvata
+      window.parseIpToBlocks = function (raw) {
+        if (!raw || typeof raw !== 'string') return false;
+        // Strip eventuale schema
+        var s = raw.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+        // Match IPv4 + porta opzionale
+        var m = s.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?::(\d{1,5}))?$/);
+        if (!m) return false;
+        oct[0].value = m[1];
+        oct[1].value = m[2];
+        oct[2].value = m[3];
+        oct[3].value = m[4];
+        if (m[5]) port.value = m[5];
+        syncHidden();
+        return true;
+      };
+
+      // Init: scrivi subito il valore corrente nel hidden
+      syncHidden();
     })();
 
     // Registrazione Service Worker per PWA solo in browser (non in app Capacitor/Electron)
