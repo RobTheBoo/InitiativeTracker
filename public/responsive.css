@@ -64,6 +64,100 @@
   gap: var(--sp-5, 20px);
 }
 
+/* B.1 — Form aggiungi nemico/alleato: su mobile wrappa in piu' righe e il
+   bottone primario va full-width sotto md, altrimenti a 375px viene tagliato
+   ("+ Alleato" sparisce a destra). */
+.master-view .add-enemy-form,
+.master-view .add-ally-form,
+.master-view .master-allies-section .add-ally-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2, 8px);
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+.master-view .add-enemy-form .effect-input,
+.master-view .add-enemy-form .effect-select,
+.master-view .add-ally-form .effect-input,
+.master-view .add-ally-form .effect-select,
+.master-view .master-allies-section .add-ally-inline .effect-input,
+.master-view .master-allies-section .add-ally-inline .effect-select {
+  flex: 1 1 140px;
+  min-width: 0;
+  min-height: var(--touch-min, 44px);
+}
+.master-view .add-enemy-form .effect-input.small,
+.master-view .add-ally-form .effect-input.small,
+.master-view .master-allies-section .add-ally-inline .effect-input.small {
+  flex: 0 1 80px;
+}
+/* Bottone primario delle form add-*: su mobile va full-width sotto la riga */
+.master-view .add-enemy-form > .btn,
+.master-view .add-ally-form > .btn,
+.master-view .master-allies-section .add-ally-inline > .btn {
+  flex: 1 1 100%;
+  min-height: var(--touch-min, 44px);
+  white-space: nowrap;
+}
+
+/* B.2 — Round display: su mobile le label "Round" e il numero stanno
+   inline (label a sinistra, numero a destra) per usare meglio lo spazio
+   verticale. Nasconde anche i font-size enormi che a 375px sprecano altezza. */
+.master-view .round-display {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--sp-2, 8px);
+  text-align: center;
+}
+.master-view .round-display .round-label {
+  display: inline;
+  font-size: var(--fs-sm, 0.85rem);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+.master-view .round-display .round-number,
+.master-view .round-display .round-number.large {
+  font-size: clamp(1.6rem, 4vw + 1rem, 2.6rem);
+  line-height: 1;
+}
+
+/* B.3 — Combat-bar fixed top non deve coprire la nav mobile sticky. Quando
+   il combat e' attivo, nascondiamo la nav (il master scrolla comunque, e
+   la combat-bar contiene gia' il turno corrente). Inoltre lasciamo spazio
+   sopra il contenuto per la combat-bar. */
+.master-view .initiative-bar-container-top.active ~ .master-mobile-tabs {
+  display: none;
+}
+.master-view .initiative-bar-container-top.active ~ .master-layout {
+  margin-top: 110px;
+}
+
+/* B.4 — Card eroe: la riga "add-effect-inline" (Nome | +/- | Rnd | +)
+   e' troppo stretta a 375px. Wrappa in 2 righe: nome full-width sopra,
+   sotto la riga +/- | Rnd | + . */
+.master-view .character-item .add-effect-inline {
+  flex-wrap: wrap;
+  gap: var(--sp-2, 6px);
+}
+.master-view .character-item .add-effect-inline .mini-input.wide {
+  flex: 1 1 100%;
+  min-width: 0;
+  min-height: 36px;
+}
+.master-view .character-item .add-effect-inline .mini-select.tiny,
+.master-view .character-item .add-effect-inline .mini-input.tiny {
+  flex: 0 0 auto;
+  min-height: 36px;
+}
+.master-view .character-item .add-effect-inline > .btn {
+  flex: 1 1 auto;
+  min-width: 44px;
+  min-height: 36px;
+}
+
 /* Tab bar mobile (iniettata via JS in master.js Fase 4 follow-up; per ora
    se l'HTML la include si renderizza, altrimenti è invisibile) */
 .master-mobile-tabs {
