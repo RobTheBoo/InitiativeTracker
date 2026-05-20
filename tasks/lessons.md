@@ -323,6 +323,128 @@ card.addEventListener('touchmove', (e) => {
 
 ---
 
+## 2026-05-20 — Android ANR (Application Not Responding) da fetch con timeout lungo
+
+**Problema.** L'APK Capacitor mostrava il dialogo "RPG Initiative Tracker
+isn't responding" dopo l'avvio, anche se i fix UX precedenti rendevano
+il login chiaro. Sintomo: l'app sembrava "freezata" per 30-60 secondi
+e poi il sistema mostrava il dialogo ANR.
+
+**Causa.** `loadRooms()` aveva `setTimeout(() => controller.abort(), 60000)`
+ovvero 60 SECONDI. Quando localStorage conteneva un `serverUrl` residuo
+(es. da una build precedente o testing), la fetch a quell'IP non piu'
+raggiungibile bloccava la JS engine main thread fino al timeout. Android
+considera ANR qualunque blocco del main thread > ~5 secondi, e il
+WebView Capacitor non sfugge alla regola: se la fetch tiene il loop
+bloccato (anche se "asincrona"), Android la rileva.
+
+**Fix.** Timeout fetch ragionevole. Per LAN domestiche: 8 secondi e'
+piu' che sufficiente. Esempio:
+
+```js
+const ctrl = new AbortController();
+const tmo = setTimeout(() => ctrl.abort(), 8000);
+try {
+  const res = await fetch(url, { signal: ctrl.signal });
+  clearTimeout(tmo);
+  // ...
+} catch (e) {
+  if (e.name === 'AbortError') alert('Timeout: server non risponde entro 8s');
+}
+```
+
+**Pattern fondamentali:**
+1. MAI usare timeout > 15s per fetch in WebView mobile, NEMMENO con la
+   scusa "rete lenta": l'ANR scatta a 5s di main thread bloccato, e
+   anche fetch presumibilmente "asincrone" possono bloccare se il
+   thread JS sta processando heavily.
+2. SEMPRE wrappare timeouts in try/catch con messaggio d'errore chiaro
+   ("Timeout: server non risponde entro Xs") cosi' l'utente capisce.
+3. PRE-FLIGHT FETCH prima dei redirect/azioni costose: se il server
+   non risponde, mostra subito un errore invece di redirect a una
+   pagina che fara' la stessa fetch fallita.
+4. SVUOTARE localStorage default values come `http://localhost:3001`:
+   in APK Capacitor `localhost` punta all'APK stesso (vedi lesson
+   2026-05-19), quindi un default cosi' fa fallire silenziosamente
+   ogni fetch al primo avvio.
+
+---
+
+## 2026-05-20 — Capacitor APK debugging: emulator + adb logcat + screencap
+
+**Workflow.** Per debuggare l'APK Capacitor in locale senza dover ogni
+volta installare sul telefono fisico:
+
+1. **AVD pronto via Android Studio**. Una volta installato Android Studio,
+   gli AVD esistono nella cartella `~/.android/avd/`. Si listano con:
+   ```powershell
+   $env:Path = "$env:LOCALAPPDATA\Android\Sdk\platform-tools;$env:LOCALAPPDATA\Android\Sdk\emulator;" + $env:Path
+   emulator -list-avds
+   ```
+
+2. **Lanciare l'emulator come processo detached** (mai inline con la
+   shell, perche' l'emulator non termina e il pipe `Out-Null` non
+   funziona):
+   ```powershell
+   Start-Process -FilePath "$env:LOCALAPPDATA\Android\Sdk\emulator\emulator.exe" `
+                 -ArgumentList "-avd","Pixel_8","-no-snapshot-save","-no-boot-anim"
+   ```
+
+3. **Aspettare boot completo**:
+   ```powershell
+   adb wait-for-device
+   adb shell getprop sys.boot_completed   # ritorna "1" quando e' OK
+   ```
+
+4. **Install APK** (`-r` = sostituisce installazione esistente
+   preservando dati):
+   ```powershell
+   adb install -r dist/RPG-Initiative-Tracker-debug.apk
+   ```
+
+5. **Pulizia dati app** (per testare onboarding pulito):
+   ```powershell
+   adb shell pm clear com.rpg.initiativetracker
+   ```
+
+6. **Lanciare l'app**:
+   ```powershell
+   adb shell am force-stop com.rpg.initiativetracker
+   adb shell am start -n com.rpg.initiativetracker/.MainActivity
+   ```
+
+7. **Screenshot** (NON usare `>` redirect in PowerShell, aggiunge BOM
+   che corrompe il PNG):
+   ```powershell
+   adb shell "screencap -p /sdcard/s.png"
+   adb pull /sdcard/s.png "C:\path\screenshot.png" 2>$null
+   ```
+
+8. **Logcat filtrato** (Capacitor: tutti i log di fetch + JS):
+   ```powershell
+   adb logcat -d -s chromium:* Capacitor:* "*:S"
+   ```
+
+9. **Network host dall'emulator**: `localhost` punta all'APK, quindi per
+   raggiungere il server sul PC host **dall'emulator usa `10.0.2.2`**
+   come IP. Esempio: server PC su `:3099` -> nell'app emulator inserisci
+   `10.0.2.2:3099`.
+
+**Pattern fondamentali:**
+- L'emulator si comporta come un device reale: stessi bug, stessi log,
+  stesso WebView. Buon proxy per i test, soprattutto per UX/timeout/ANR.
+- Per ANR e timing: l'emulator software-only puo' essere piu' lento del
+  telefono reale, quindi un timeout che funziona sul telefono potrebbe
+  triggerare ANR sull'emulator. Setta i timeout sull'emulator, e
+  funzioneranno sicuramente sul telefono.
+- Se non puoi cliccare facilmente i bottoni via `adb shell input tap`
+  (coordinate scale!), usa Chrome DevTools remote: connetti il device
+  via USB con USB debugging attivo, vai a `chrome://inspect#devices`
+  su Chrome desktop, ispeziona il WebView dell'app come una pagina
+  qualunque (DOM, console, network, sources).
+
+---
+
 ## 2026-05-19 — Capacitor APK: `window.location.origin` punta all'APK, non al server LAN
 
 **Problema.** Quando l'app gira come APK Android (Capacitor), gli asset
