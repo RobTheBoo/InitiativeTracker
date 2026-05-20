@@ -24,7 +24,14 @@ let serverUrl = '';
   }
   // 2. Capacitor APK: cerchiamo serverUrl salvato
   if (isCapacitorApp) {
-    serverUrl = (function () { try { return localStorage.getItem('serverUrl') || ''; } catch (_) { return ''; } })();
+    let saved = '';
+    try { saved = localStorage.getItem('serverUrl') || ''; } catch (_) {}
+    // Fallback: in APK il Master ha SEMPRE il server Node embedded a localhost.
+    // Quindi se non abbiamo un serverUrl esplicito (es. l'utente e' un Player
+    // che ha gia' selezionato il server del Master via QR/IP nel passato),
+    // usiamo localhost. Se l'utente e' un Player la prima volta, dovra' fare
+    // l'onboarding manuale (mostriamo prompt qui sotto).
+    serverUrl = saved || 'http://localhost:3001';
     return;
   }
   // 3. Browser standard / Electron: l'origin e' il server stesso

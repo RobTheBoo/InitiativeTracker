@@ -7,6 +7,26 @@ if (typeof io === 'undefined') {
   throw new Error('Socket.IO non caricato');
 }
 
+// ----------------------------------------------------------------------------
+// Capacitor APK detection: dentro l'APK Master il server Node.js gira
+// localmente, quindi il "serverUrl" e' SEMPRE http://localhost:3001 e l'utente
+// non deve digitare l'IP. In browser desktop / PWA / Player remoto, niente
+// localhost: si usa il flusso classico (input IP del Master).
+// ----------------------------------------------------------------------------
+window.isCapacitorApp = (function () {
+  try {
+    return !!(window.Capacitor && typeof window.Capacitor.getPlatform === 'function'
+      && window.Capacitor.getPlatform() !== 'web');
+  } catch (_) {
+    return false;
+  }
+})();
+window.LOCAL_NODE_SERVER = 'http://localhost:3001';
+
+if (window.isCapacitorApp) {
+  console.log('📱 Modalita\' Capacitor APK rilevata. Il server Node.js e\' embedded in-app:', window.LOCAL_NODE_SERVER);
+}
+
 // Definisci connectToServerHandler PRIMA di tutto, così è disponibile immediatamente
 window.connectToServerHandler = async function(e) {
   if (e) {
@@ -169,6 +189,15 @@ window.connectToServerHandler = async function(e) {
 //    il server LAN risponda davvero PRIMA di redirect (cosi' niente schermate
 //    "stanze vuote" da fetch fallita silenziosa in Capacitor).
 window.openAsMaster = async function () {
+  // CASO 1: Capacitor APK. Il server Node gira embedded sul telefono.
+  // Niente IP da digitare: pre-flight verso localhost:3001, poi mostra
+  // overlay con IP LAN del telefono + QR per i Player.
+  if (window.isCapacitorApp) {
+    return await openAsMasterCapacitor();
+  }
+
+  // CASO 2: browser/PWA/Player remoto. L'utente DEVE digitare l'IP del PC
+  // Master (server gira sull'EXE Electron del PC, non in-app).
   const oct = [
     document.getElementById('ip-octet-1'),
     document.getElementById('ip-octet-2'),
@@ -236,6 +265,107 @@ window.openAsMaster = async function () {
   const url = '/room-selector.html?server=' + encodeURIComponent(server);
   window.location.href = url;
 };
+
+// ----------------------------------------------------------------------------
+// Flow "Sono il Master" dentro l'APK Capacitor.
+//   1. Aspetta che il server Node embedded sia su (poll /api/server-info su
+//      localhost:3001 per max 60s — primo boot di nodejs-mobile e' ~25s).
+//   2. Mostra UN OVERLAY con: IP LAN del telefono in formato grande, QR code,
+//      pulsante "Apri stanze" che porta a /room-selector.html.
+//   3. I Player esterni scansionano il QR (Google Lens / Camera) e ottengono
+//      l'URL diretto da aprire nel browser, oppure vengono guidati a inserire
+//      l'IP a mano nell'app Player.
+// ----------------------------------------------------------------------------
+async function openAsMasterCapacitor() {
+  const setDebug = (msg) => {
+    const debug = document.getElementById('debug-content');
+    if (debug) debug.textContent = msg;
+  };
+  showMasterBootingOverlay('Attendo il server interno…');
+
+  let info = null;
+  const startedAt = Date.now();
+  const TIMEOUT = 60000;
+  while (Date.now() - startedAt < TIMEOUT) {
+    try {
+      const ctrl = new AbortController();
+      const tmo = setTimeout(() => ctrl.abort(), 4000);
+      const res = await fetch(`${window.LOCAL_NODE_SERVER}/api/server-info`, { signal: ctrl.signal });
+      clearTimeout(tmo);
+      if (res.ok) {
+        info = await res.json();
+        break;
+      }
+    } catch (_) { /* retry */ }
+    await new Promise(r => setTimeout(r, 1000));
+    showMasterBootingOverlay(`Attendo il server interno… (${Math.round((Date.now() - startedAt) / 1000)}s)`);
+  }
+
+  if (!info) {
+    hideMasterBootingOverlay();
+    alert('⚠️ Il server interno non e\' partito entro 60s. Chiudi e riapri l\'app, oppure controlla i log.');
+    setDebug('❌ Timeout boot server interno');
+    return;
+  }
+
+  console.log('✅ Server interno pronto:', info);
+  setDebug(`✅ Server interno: ${info.primaryIp}:${info.port}`);
+  hideMasterBootingOverlay();
+
+  try { localStorage.setItem('serverUrl', window.LOCAL_NODE_SERVER); } catch (_) {}
+  showMasterServerOverlay(info);
+}
+
+// Overlay "in caricamento" mentre attendiamo il Node ready.
+function showMasterBootingOverlay(text) {
+  let el = document.getElementById('master-booting-overlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'master-booting-overlay';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);color:#f0c674;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;font-family:Inter,sans-serif;padding:20px;text-align:center;';
+    el.innerHTML = '<div style="font-size:3rem">⏳</div><div id="master-booting-text" style="margin-top:16px;font-size:1.2rem;max-width:320px;line-height:1.5"></div>';
+    document.body.appendChild(el);
+  }
+  const t = document.getElementById('master-booting-text');
+  if (t) t.textContent = text || 'Attendo…';
+}
+function hideMasterBootingOverlay() {
+  const el = document.getElementById('master-booting-overlay');
+  if (el) el.remove();
+}
+
+// Overlay "Server attivo" con IP LAN, QR e bottone Apri stanze.
+function showMasterServerOverlay(info) {
+  const lanIp = info.primaryIp;
+  const port = info.port;
+  const lanUrl = `http://${lanIp}:${port}/`;
+  const qrSrc = `${window.LOCAL_NODE_SERVER}/api/qr?url=${encodeURIComponent(lanUrl)}&size=320`;
+
+  const ov = document.createElement('div');
+  ov.id = 'master-server-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:#1a1a2e;color:#f0c674;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow:auto;z-index:9999;font-family:Inter,sans-serif;padding:24px 18px;text-align:center;';
+  ov.innerHTML = `
+    <h2 style="margin:0 0 6px 0;font-family:Cinzel,serif">🎭 Sei il Master</h2>
+    <p style="margin:0 0 16px 0;opacity:.85;max-width:340px">Il server gira sul tuo telefono. Gli altri giocatori si collegano alla stessa Wi-Fi e scansionano il QR qui sotto.</p>
+    <div style="background:#fff;padding:12px;border-radius:12px;margin:8px 0">
+      <img alt="QR connessione" src="${qrSrc}" style="display:block;width:280px;height:280px"/>
+    </div>
+    <div style="margin-top:14px;font-size:1.1rem">
+      <span style="opacity:.7">URL:</span>
+      <strong style="color:#fff;background:rgba(240,198,116,.15);padding:4px 8px;border-radius:6px;display:inline-block;margin-top:4px">${lanUrl}</strong>
+    </div>
+    <p style="opacity:.65;font-size:.85rem;max-width:340px;margin-top:14px">Se i giocatori non possono scansionare, fagli digitare l'IP <strong>${lanIp}</strong> e la porta <strong>${port}</strong> nella schermata "Sono Giocatore".</p>
+    <button id="master-overlay-continue" style="margin-top:20px;padding:14px 28px;font-size:1.05rem;background:linear-gradient(135deg,#f0c674,#d4af37);color:#1a1a2e;border:none;border-radius:10px;font-weight:700;cursor:pointer">⚔️ Apri le stanze</button>
+    <button id="master-overlay-close" style="margin-top:10px;padding:10px 18px;font-size:.9rem;background:transparent;color:#f0c674;border:1px solid rgba(240,198,116,.4);border-radius:8px;cursor:pointer">Chiudi</button>
+  `;
+  document.body.appendChild(ov);
+
+  document.getElementById('master-overlay-continue').onclick = () => {
+    const url = '/room-selector.html?server=' + encodeURIComponent(window.LOCAL_NODE_SERVER);
+    window.location.href = url;
+  };
+  document.getElementById('master-overlay-close').onclick = () => ov.remove();
+}
 
 window.tryAutoDiscover = async function() {
   const ipInput = document.getElementById('server-ip-input');

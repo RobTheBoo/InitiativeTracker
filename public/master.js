@@ -34,11 +34,11 @@ if (window.electronAPI && window.electronAPI.isElectron) {
     socketUrl = decodeURIComponent(serverParam);
     try { localStorage.setItem('serverUrl', socketUrl); } catch (_) {}
   } else if (isCapacitorApp) {
-    try { socketUrl = localStorage.getItem('serverUrl') || ''; } catch (_) {}
-    if (!socketUrl) {
-      // APK senza serverUrl: torna alla vista giocatore (l'utente inserisce IP li').
-      console.warn('⚠️ APK Master senza serverUrl: redirect a /index.html');
-      window.location.href = '/index.html';
+    // In APK il server gira embedded sul telefono. Il default e' localhost
+    // (= il Node.js dentro lo stesso APK), salvo override esplicito (es.
+    // l'utente apre /master.html sull'APK ma per testare un server remoto).
+    try { socketUrl = localStorage.getItem('serverUrl') || 'http://localhost:3001'; } catch (_) {
+      socketUrl = 'http://localhost:3001';
     }
   } else {
     socketUrl = window.location.origin;
