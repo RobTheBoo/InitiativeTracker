@@ -159,21 +159,80 @@ window.connectToServerHandler = async function(e) {
 // Apri room-selector.html come Master, propagando l'IP server inserito.
 // Caso d'uso: utente da APK/browser tap "🎭 Sono il Master" → vediamo le stanze
 // remote e possiamo creare/scegliere come master da telefono.
-// Usa il valore corrente del campo IP (hidden #server-ip-input) come server param.
-window.openAsMaster = function () {
-  const hidden = document.getElementById('server-ip-input');
-  let server = (hidden && hidden.value || '').trim();
-  if (!server) {
-    alert('⚠️ Inserisci prima l\'IP del server nei blocchi sopra.');
+//
+// Logica di validazione:
+// 1. Legge i 4 blocchi IP + porta direttamente (NON il hidden #server-ip-input
+//    che ha default "192.168..:3001" e per i blocchi vuoti puo' produrre
+//    stringhe formalmente non vuote ma logicamente invalide).
+// 2. Verifica che TUTTI gli ottetti siano numeri 0-255.
+// 3. Se OK, fa il primo handshake fetch /api/server-info per controllare che
+//    il server LAN risponda davvero PRIMA di redirect (cosi' niente schermate
+//    "stanze vuote" da fetch fallita silenziosa in Capacitor).
+window.openAsMaster = async function () {
+  const oct = [
+    document.getElementById('ip-octet-1'),
+    document.getElementById('ip-octet-2'),
+    document.getElementById('ip-octet-3'),
+    document.getElementById('ip-octet-4')
+  ];
+  const portEl = document.getElementById('ip-port');
+  const debug = document.getElementById('debug-content');
+  const setDebug = (msg) => { if (debug) debug.textContent = msg; };
+
+  if (oct.some(e => !e) || !portEl) {
+    alert('⚠️ Errore interno: campi IP non trovati.');
     return;
   }
-  // Normalizza in formato URL completo
-  if (!/^https?:\/\//i.test(server)) server = 'http://' + server;
-  // Verifica formato base IPv4:port — se invalido, blocca
-  if (!/^https?:\/\/[^\/]+:\d+$/.test(server)) {
-    alert('⚠️ IP non valido. Deve essere come 192.168.1.27:3001');
+
+  const octVals = oct.map(e => (e.value || '').trim());
+  const portVal = (portEl.value || '').trim() || '3001';
+
+  const allOctOk = octVals.every(v => /^\d{1,3}$/.test(v) && Number(v) >= 0 && Number(v) <= 255);
+  const portOk = /^\d{1,5}$/.test(portVal) && Number(portVal) >= 1 && Number(portVal) <= 65535;
+
+  if (!allOctOk || !portOk) {
+    alert('⚠️ Inserisci un IP completo nei 4 blocchi sopra (es. 192.168.1.27) e una porta (default 3001), poi riprova.');
+    if (oct[2] && !octVals[2]) oct[2].focus();
+    else if (oct[3] && !octVals[3]) oct[3].focus();
     return;
   }
+
+  const server = `http://${octVals.join('.')}:${portVal}`;
+  console.log('🎭 openAsMaster server:', server);
+  setDebug(`🎭 Verifica server: ${server}\n(timeout 8s)...`);
+
+  // Pre-flight: fetch /api/server-info per assicurarci che il server LAN
+  // risponda prima di navigare. Cosi' se l'IP e' sbagliato o il PC Master
+  // non e' acceso, l'utente lo vede SUBITO con un messaggio chiaro.
+  try {
+    const ctrl = new AbortController();
+    const tmo = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(`${server}/api/server-info`, { signal: ctrl.signal });
+    clearTimeout(tmo);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const info = await res.json();
+    console.log('✅ Server info OK:', info);
+    setDebug(`✅ Server raggiungibile: ${server}\n→ apro selettore stanze...`);
+  } catch (err) {
+    console.error('❌ Pre-flight fallito:', err);
+    const msg = (err && err.name === 'AbortError')
+      ? 'Timeout: il server non risponde entro 8s.'
+      : (err && err.message) || 'Errore sconosciuto';
+    setDebug(`❌ Server NON raggiungibile: ${server}\n${msg}`);
+    alert(
+      '⚠️ Il server LAN non risponde a ' + server + '\n\n' +
+      'Verifica:\n' +
+      '1. Il PC Master e\' acceso e l\'app desktop e\' aperta\n' +
+      '2. Telefono e PC sono sulla stessa rete Wi-Fi\n' +
+      '3. L\'IP e\' corretto (sul PC: vedi room-selector / dashboard)\n' +
+      '4. Firewall Windows non blocca la porta ' + portVal + '\n\n' +
+      'Errore: ' + msg
+    );
+    return;
+  }
+
+  // Salva serverUrl per le pagine successive (master.html, fetch /api/...)
+  try { localStorage.setItem('serverUrl', server); } catch (_) {}
   const url = '/room-selector.html?server=' + encodeURIComponent(server);
   window.location.href = url;
 };
@@ -1523,11 +1582,14 @@ async function loadRooms() {
       debugArea.style.display = 'block';
       debugContent.textContent = `🔄 Caricamento stanze...\nURL: ${serverUrlToUse || apiUrl}`;
     }
-    
+
     console.log('📡 Fetch a:', apiUrl);
-    
+
+    // Timeout 8s (era 60s = causava ANR su APK quando l'IP salvato non era piu'
+    // raggiungibile, es. dopo cambio rete o reinstallazione). 8s e' lungo
+    // abbastanza per LAN lente ma non blocca il main thread.
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 secondi
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
     
     const response = await fetch(apiUrl, {
       method: 'GET',

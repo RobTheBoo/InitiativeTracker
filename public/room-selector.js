@@ -56,14 +56,29 @@ async function loadRooms() {
         showServerNeededPrompt();
         return;
       }
-      const response = await fetch(apiUrl('/api/rooms'));
+      const fetchUrl = apiUrl('/api/rooms');
+      console.log('📋 GET', fetchUrl);
+      const ctrl = new AbortController();
+      const tmo = setTimeout(() => ctrl.abort(), 8000);
+      const response = await fetch(fetchUrl, { signal: ctrl.signal });
+      clearTimeout(tmo);
+      if (!response.ok) throw new Error('HTTP ' + response.status);
       rooms = await response.json();
+      console.log('✅ Stanze caricate:', rooms.length);
     }
     renderRooms();
   } catch (error) {
     console.error('❌ Errore caricamento stanze:', error);
-    const errorMsg = error.message || 'Errore sconosciuto';
-    showServerError(`❌ Impossibile caricare le stanze.\n\nErrore: ${errorMsg}\n\nVerifica:\n1. IP server corretto\n2. Master avviato\n3. Stessa rete Wi-Fi`);
+    const isTimeout = error && error.name === 'AbortError';
+    const errorMsg = isTimeout
+      ? `Timeout 8s: il server non risponde a ${serverUrl}`
+      : (error.message || 'Errore sconosciuto');
+    showServerError(
+      `❌ Impossibile caricare le stanze.\n\n` +
+      `URL tentato: ${serverUrl || '(nessuno)'}\n` +
+      `Errore: ${errorMsg}\n\n` +
+      `Verifica:\n1. IP server corretto\n2. Master avviato\n3. Stessa rete Wi-Fi\n4. Firewall non blocca`
+    );
   }
 }
 
@@ -177,18 +192,37 @@ async function createRoom() {
       // Electron: usa le API
       await window.electronAPI.createRoom(name);
     } else {
-      await fetch(apiUrl('/api/rooms/create'), {
+      const fetchUrl = apiUrl('/api/rooms/create');
+      console.log('➕ POST', fetchUrl);
+      const ctrl = new AbortController();
+      const tmo = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch(fetchUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name })
+        body: JSON.stringify({ name }),
+        signal: ctrl.signal
       });
+      clearTimeout(tmo);
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error('HTTP ' + res.status + (text ? ': ' + text.slice(0, 200) : ''));
+      }
     }
 
     nameInput.value = '';
     await loadRooms();
   } catch (error) {
     console.error('Errore creazione stanza:', error);
-    alert('Errore durante la creazione della stanza');
+    const isTimeout = error && error.name === 'AbortError';
+    const msg = isTimeout
+      ? `Timeout: il server non risponde a ${serverUrl}`
+      : (error.message || 'Errore sconosciuto');
+    alert(
+      '❌ Errore durante la creazione della stanza\n\n' +
+      `URL: ${serverUrl || '(nessuno)'}\n` +
+      `Errore: ${msg}\n\n` +
+      'Verifica che il PC Master sia acceso e raggiungibile.'
+    );
   }
 }
 

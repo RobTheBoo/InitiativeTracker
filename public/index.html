@@ -71,8 +71,11 @@
            input #server-ip-input cosi' tutta la logica esistente di app.js continua
            a funzionare senza modifiche al protocollo. -->
       <div id="server-ip-section" style="background: var(--card-bg); padding: 20px; border-radius: 12px; margin-bottom: 30px; max-width: 500px; margin-left: auto; margin-right: auto;">
-        <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px;">
+        <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 6px;">
           📡 <strong>IP del Master</strong>
+        </div>
+        <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 10px; opacity: 0.85;">
+          Inserisci nei due blocchi vuoti l'IP che vedi sul PC del Master nella schermata "Stanze" (es. <code style="color: var(--accent-gold);">192.168.1.27:3001</code>).
         </div>
 
         <div class="ip-blocks" role="group" aria-label="Indirizzo IP del Master">
@@ -80,14 +83,16 @@
           <span class="ip-sep" aria-hidden="true">.</span>
           <input type="text" id="ip-octet-2" class="ip-octet" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="168" autocomplete="off" aria-label="Secondo ottetto">
           <span class="ip-sep" aria-hidden="true">.</span>
-          <input type="text" id="ip-octet-3" class="ip-octet" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="1" autocomplete="off" aria-label="Terzo ottetto">
+          <input type="text" id="ip-octet-3" class="ip-octet" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="?" autocomplete="off" aria-label="Terzo ottetto">
           <span class="ip-sep" aria-hidden="true">.</span>
-          <input type="text" id="ip-octet-4" class="ip-octet" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="100" autocomplete="off" aria-label="Quarto ottetto">
+          <input type="text" id="ip-octet-4" class="ip-octet" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="?" autocomplete="off" aria-label="Quarto ottetto">
           <span class="ip-sep" aria-hidden="true">:</span>
           <input type="text" id="ip-port" class="ip-port" inputmode="numeric" pattern="[0-9]*" maxlength="5" value="3001" autocomplete="off" aria-label="Porta">
         </div>
-        <!-- Hidden: contiene "host:port" e viene letto da connectToServerHandler in app.js -->
-        <input type="hidden" id="server-ip-input" value="192.168..:3001">
+        <!-- Hidden: contiene "host:port" (concatenato dai blocchi). Default vuoto:
+             cosi' connectToServerHandler / openAsMaster non possono confondersi
+             pensando che ci sia gia' un IP valido da provare. -->
+        <input type="hidden" id="server-ip-input" value="">
 
         <div style="display: flex; gap: 10px; align-items: center; margin-top: 12px; justify-content: flex-end;">
           <button type="button" id="connect-ip-btn" class="btn primary" style="white-space: nowrap; min-height: 44px; min-width: 140px; cursor: pointer; touch-action: manipulation;"
@@ -133,6 +138,20 @@
           color: var(--accent-gold, #d4af37);
           -webkit-user-select: text;
           user-select: text;
+        }
+        /* Placeholder grigi e in italico per non essere confusi con valori reali.
+           A 0.45 opacity sono chiaramente "missing input" rispetto al testo pieno. */
+        .ip-blocks .ip-octet::placeholder,
+        .ip-blocks .ip-port::placeholder {
+          color: rgba(212, 175, 55, 0.45);
+          font-style: italic;
+          font-weight: 400;
+        }
+        /* Bordo rosso tenue sui blocchi vuoti per attirare l'occhio */
+        .ip-blocks .ip-octet:placeholder-shown,
+        .ip-blocks .ip-port:placeholder-shown {
+          border-color: rgba(255, 107, 107, 0.6);
+          background: rgba(255, 107, 107, 0.06);
         }
         .ip-blocks .ip-octet { width: 56px; }
         .ip-blocks .ip-port  { width: 76px; }
