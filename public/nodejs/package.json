@@ -1,0 +1,7 @@
+{
+  "name": "rpg-tracker-mobile-server",
+  "version": "1.0.0",
+  "description": "Server Node.js embedded che gira dentro l'APK Master via Capacitor-NodeJS",
+  "main": "./index.js",
+  "private": true
+}

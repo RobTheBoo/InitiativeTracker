@@ -8,5 +8,10 @@
   },
   "android": {
     "allowMixedContent": true
+  },
+  "plugins": {
+    "CapacitorNodeJS": {
+      "nodeDir": "nodejs"
+    }
   }
 }

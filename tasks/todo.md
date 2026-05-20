@@ -1,149 +1,116 @@
-# Master Android utilizzabile — Piano
+# Server-on-Phone (APK Master autonomo) — Piano
 
-> Obiettivo: rendere la vista **Master** usabile e leggibile da APK Android e da
-> browser non-Electron. Auth scelta: **"primo arrivato vince"** (chi clicca
-> "Sono Master" prende il ruolo, gli altri lo perdono).
->
-> Stato pre-piano (confermato con test in locale a 375×667 il 2026-05-19):
-> - Layout responsive base già funzionante (1 col mobile, 2 col 768, 3 col 1024)
-> - Tab-bar mobile sticky, combat-bar mobile, theme/orient toggle: già OK
-> - Manca: sblocco non-Electron, 4 bug visivi mobile, drag tie touch, routing APK
+> **Decisione 2026-05-20**: spostare il server Node.js DENTRO l'APK Capacitor
+> usando il plugin [hampoelz/Capacitor-NodeJS](https://github.com/hampoelz/Capacitor-NodeJS).
+> Risultato: il telefono Master diventa un host LAN, gli altri telefoni Player
+> si collegano a `http://<IP-master>:3001`. Niente PC necessario.
 
 ---
 
-## Blocco B — Bug visivi mobile [CSS only, basso rischio]
+## Obiettivo
 
-Stima: 1-2 ore.
+Quando l'utente apre l'APK Master e tappa "🎭 Sono il Master":
+1. Parte un Node.js server interno alla porta 3001 sull'IP WiFi del telefono.
+2. Lo schermo mostra un **QR code col proprio IP LAN** + numero (es. `192.168.1.27:3001`).
+3. Telefoni Player aprono l'APK Player (= stesso APK), scansionano il QR (o
+   digitano IP a mano), si collegano. Niente IP da inserire sul Master.
+4. Foreground Service tiene il server attivo anche con schermo spento.
 
-- [ ] **B.1**: `add-ally-form` e `add-enemy-form` (Master view) wrappano in 2
-  righe sotto md. Oggi a 375px il bottone "+ Alleato" è tagliato a destra.
-  - Fix in `responsive.css`: `flex-wrap: wrap` + ogni input/btn `min-width: 0`,
-    bottone primario (`.btn.success` / `.btn.primary` finale) full-width sotto
-    768px.
-- [ ] **B.2**: `round-display` deve mostrare la label "Round" visibile su mobile.
-  Oggi a 375px si vede solo il "1" perché la label "Round" è tagliata.
-  - Fix in `style.css` o `responsive.css`: layout flex-row con label inline.
-- [ ] **B.3**: `combat-bar` sticky non deve sovrapporsi a `master-mobile-tabs`.
-  Oggi quando il combat parte, la nav mobile sparisce sotto la combat-bar.
-  - Fix: o `top: var(--combat-bar-height, 64px)` sulla nav, o nascondere la nav
-    mentre il combat è attivo (master può scrollare comunque).
-- [ ] **B.4**: card eroe con form effetti — su sm (480px) la riga
-  `Nome | +/- | Rnd | +` è troppo stretta. Wrappa in 2 righe (`Nome` su prima
-  riga full-width, `+/- | Rnd | +` sotto).
-- [ ] Verifica visiva a 375 / 768 / 1024 px (combat ON/OFF) → screenshot.
-- [ ] Commit `fix(ui): bug visivi master mobile (form wrap, round label, combat-bar overlap)`.
+## Vincoli
 
-## Blocco A — Sblocco "primo arrivato" [server + client]
+- Battery: foreground service + notifica persistente (richiesto Android 8+).
+- APK size: 4.3 MB → ~50-70 MB (Node runtime ARM64).
+- iOS: NON supportato (limitazione Apple/JIT). Non e' un problema, l'utente
+  usa solo Android.
+- Compatibilita' Capacitor 7+ (oggi siamo a 7).
 
-Stima: 30-60 min.
+## Percorso a step (con check-point dopo ogni step)
 
-- [ ] **A.1**: rimuovi check `isLocalhost` in `electron/room-manager.js:178-193`.
-  Lascia solo il check esistente "masterId già occupato" (~196-202).
-- [ ] **A.2**: rimuovi guard "non Electron" in `public/master.js:892-898`
-  (redirect a `/index.html`).
-- [ ] **A.3**: aggiungi snackbar/toast informativo se il client riceve
-  `error: 'Master già connesso'` con CTA "Vai a Giocatore" / "Riprova".
-- [ ] **A.4**: test E2E veloce: `npm test` deve restare verde (i test e2e usano
-  socket non-localhost, oggi probabilmente passano grazie a `127.0.0.1`).
-- [ ] Test manuale: apri `master.html` da browser non-Electron, diventa Master.
-  Apri seconda finestra, ricevi errore "già connesso".
-- [ ] Commit `feat(master): sblocca becomeMaster da qualunque client (auth primo arrivato)`.
+### Step 1 — Proof of Concept (2-3h)
 
-## Blocco C — Form e modali ottimizzate per touch
+- [ ] **1a**: `npm install @hampoelz/capacitor-nodejs` (o fork mantenuto).
+- [ ] **1b**: scaffolding `nodejs/` directory in `public/`. Hello world Node:
+  un Express che risponde `{ ok: true, ip: <IP> }` su `/health`.
+- [ ] **1c**: build APK (rebuild script gia' funziona). Install emulator.
+  Verifica via `adb forward tcp:3001 tcp:3001` + `curl localhost:3001/health`
+  che il server risponda.
+- [ ] **1d**: secondo emulator (o device fisico) → test LAN reale (non solo
+  via adb forward). NB: `emulator -netdelay none -netspeed full -dns-server
+  192.168.1.1` per propagazione DNS, oppure `adb -s <emul-2> shell` con
+  `192.168.X.Y`.
 
-Stima: 2-3 ore.
+**Check-point.** Se 1c o 1d falliscono → STOP, fallback a mDNS+QR su
+architettura attuale (opzione C).
 
-- [ ] **C.1**: modale "Iniziative Uguali" (`#initiative-tie-modal`): il
-  drag-and-drop HTML5 (commit 742742d) non funziona su touch device.
-  Aggiungi listener `touchstart/touchmove/touchend` che simulano drag,
-  con `touch-action: none` su `.tie-card[draggable="true"]`.
-- [ ] **C.2**: `<input list="effects-datalist">` su Android copre i bottoni
-  sotto. Fix con `position: relative` sul container o cambio in select custom.
-- [ ] Test manuale del flusso "iniziativa uguale" da telefono.
-- [ ] Commit `feat(touch): drag-and-drop tie reorder + datalist fixes per mobile`.
+### Step 2 — Porting server (4-6h)
 
-## Blocco D — APK Master entry-point
+- [ ] **2a**: spostare `src/server/`, `src/storage/`, `src/sync/` in
+  `nodejs/server/` (o equivalente). Tutto il codice e' gia' modulare.
+- [ ] **2b**: sostituire `better-sqlite3` con il fork
+  [`digidem/better-sqlite3-nodejs-mobile`](https://github.com/digidem/better-sqlite3-nodejs-mobile).
+  Verificare ABI (ARM64 + ARMv7).
+- [ ] **2c**: avviare il server reale dentro Capacitor-NodeJS process.
+  Healthcheck: `/api/server-info`, `/api/rooms`, `/api/health`.
 
-Stima: 3-4 ore.
+**Check-point.** Se `better-sqlite3` mobile non compila → fallback a `sql.js`
+(SQLite WebAssembly puro JS) — piu' lento ma sempre cross-platform.
 
-- [ ] **D.1**: trasforma `room-selector.html` per essere usabile anche da APK:
-  - Se non-Electron e non c'è IP server salvato → mostra blocchi IP (riusa
-    `parseIpToBlocks` da `public/index.html`) + pulsante "Connetti".
-  - Dopo connect: mostra lista stanze remote con due bottoni per stanza:
-    "Entra come Master" / "Entra come Giocatore".
-- [ ] **D.2**: `capacitor.config.json`: definisci entry point dell'APK su
-  `/room-selector.html` (oggi parte da `/index.html`). Verifica `webDir`.
-- [ ] **D.3**: `master.js`: gestisci il caso non-Electron (no IPC), ricava
-  `socketUrl` da `window.location.origin`. Aggiungi link "← Torna alle stanze"
-  che usa `window.location.href = '/room-selector.html'` quando non-Electron.
-- [ ] **D.4**: rebuild APK con `BUILDA-APK.ps1` → APK in `dist/`.
-- [ ] Test manuale su browser mobile-emulato. Test su device reale se
-  disponibile.
-- [ ] Commit `feat(apk): vista Master accessibile da APK Android via room-selector mobile`.
-- [ ] Push `git push origin main`.
+### Step 3 — UX onboarding senza IP (3-5h)
 
-## Verifica finale
+- [ ] **3a**: master.html / master.js — quando in APK Master, socket.io si
+  collega a `http://localhost:3001` (in-app, dentro il telefono).
+- [ ] **3b**: nuova pagina o sezione "🎭 Master attivo" che mostra:
+  - IP LAN del proprio telefono (via plugin `@capacitor/network` o nativo).
+  - QR code dell'URL completo.
+  - Pulsante "Stop server".
+- [ ] **3c**: APK Player — pulsante "📷 Scansiona QR" (plugin
+  `@capacitor-mlkit/barcode-scanning` o `@capacitor-community/barcode-scanner`),
+  riempie automaticamente i blocchi IP e clicca Connetti.
 
-- [ ] `npm test` con server di test su `:3099` → tutti passati.
-- [ ] Smoke test: avvia EXE → crea room → telefono APK entra come Master →
-  secondo telefono entra come Giocatore → combattimento.
-- [ ] Aggiorna tasks/todo.md sezione "Review".
-- [ ] Aggiorna tasks/lessons.md con eventuali pattern emersi.
+**Check-point.** Demo: 1 emulator Master + 1 emulator Player → join via
+QR/IP → combat round.
 
----
+### Step 4 — Permessi & Foreground Service (2-4h)
 
-## Decisioni
+- [ ] **4a**: AndroidManifest:
+  - `FOREGROUND_SERVICE`
+  - `FOREGROUND_SERVICE_DATA_SYNC` (Android 14+)
+  - `POST_NOTIFICATIONS` (Android 13+, runtime)
+  - `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE` (per leggere IP LAN)
+- [ ] **4b**: Foreground Service Android nativo (Kotlin/Java) che mantiene
+  il Node process vivo + notifica persistente "Server attivo - tap per fermare".
+  Il plugin Capacitor-NodeJS forse lo include gia'; se no, scriverlo.
+- [ ] Test stabilita': spegni schermo, ricevi chiamata, ruota telefono → server
+  deve restare up.
 
-- **Auth Master**: "primo arrivato vince" (decisa 2026-05-19). Cooldown 30s
-  prima di permettere takeover dopo disconnect — `OPZIONALE`, non in MVP.
-- **APK firma**: resta debug (non release), va bene per uso domestico/LAN.
-- **Versioning**: bump a `1.0.1` solo in release finale, non per ogni blocco.
+### Step 5 — Build APK + test (2-4h)
 
-## Stima totale
+- [ ] **5a**: build APK release-unsigned in `dist/RPG-Initiative-Tracker-server-debug.apk`.
+  Install su 2 emulator. Smoke test: crea stanza Master, Player si connette,
+  combat 2 round.
+- [ ] **5b**: aggiorna `tasks/todo.md` Review + nuova sezione in `tasks/lessons.md`
+  ("Capacitor-NodeJS embedding: gotchas"). Commit + push.
 
-| Blocco | Effort | Rischio |
+## Rollback
+
+Se uno step fallisce in modo bloccante:
+- Tutti i commit sono atomici per step → `git revert <commit-step-N>` torna
+  alla versione precedente.
+- Fallback C (mDNS + QR su architettura PC-server attuale) e' sempre
+  raggiungibile in ~3-5h aggiuntive.
+
+## Stima tempo totale
+
+| Step | Effort | Rischio |
 |---|---|---|
-| B — Bug visivi mobile | 1-2h | Basso |
-| A — Sblocco primo arrivato | 30-60min | Basso |
-| C — Touch friendly | 2-3h | Medio (drag touch) |
-| D — Routing APK + room-selector mobile | 3-4h | Medio |
+| 1 — PoC | 2-3h | Basso |
+| 2 — Porting server | 4-6h | Medio (better-sqlite3 mobile) |
+| 3 — UX onboarding QR | 3-5h | Basso |
+| 4 — Foreground service | 2-4h | Medio (Kotlin nativo) |
+| 5 — Build & test | 2-4h | Basso |
 
-**Totale: 7-10 ore di lavoro effettivo.**
+**Totale 13-22 ore** lavoro effettivo, con check-point dopo ogni step.
 
-## Review (2026-05-19)
+## Review
 
-Tutti e 4 i blocchi completati e pushati su `origin/main` in 4 commit
-atomici:
-
-| Commit | Descrizione | Files | Test |
-|---|---|---|---|
-| `e82d03d` | Blocco B: bug visivi mobile (form wrap, round label, combat-bar overlap) | 2 | E2E 53/53 |
-| `7197729` | Blocco A: sblocca becomeMaster da qualunque client (auth primo arrivato) | 2 | E2E 53/53 + manuale browser non-Electron |
-| `6459596` | Blocco C: drag-and-drop initiative bar funziona su mobile (long-press 250ms) | 2 | E2E 53/53 |
-| `b22664d` | Blocco D: vista Master accessibile da APK Android via room-selector mobile | 4 | E2E 53/53 + manuale flow room-selector → master |
-
-Outcome:
-- Vista Master raggiungibile da APK / browser / Electron tutti via stesso
-  flusso. Auth "primo arrivato vince" (decisa il 2026-05-19).
-- APK rebuildato in `dist/RPG-Initiative-Tracker-debug.apk` (4225 KB,
-  gradle BUILD SUCCESSFUL in 21s).
-- Drag-and-drop initiative bar funziona ora su touch device con long-press
-  250ms + haptic feedback (navigator.vibrate).
-
-Skipped nel MVP (annotato per futuro):
-- C.2: il dropdown `<input list="effects-datalist">` su Android puo' coprire
-  i bottoni sotto. Il dropdown e' nativo, fix CSS-only non risolve.
-  Da valutare con select custom se l'usabilita' non basta in test reale.
-- Cooldown 30s per takeover Master dopo disconnect: skip MVP.
-- Versioning: APK resta debug + versionCode 1.0; bump quando si fa la
-  release stabile. Per uso domestico/LAN va bene cosi'.
-
-Tempo effettivo: ~2.5 ore (vs. stima 7-10h grazie al codebase gia' molto
-responsive e a room-selector.js gia' browser-aware).
-
-Prossimi step potenziali (NON nel MVP):
-- Test su device fisico Android per validare touch DnD reale.
-- Snackbar/toast invece di alert per "Master gia' connesso" (oggi mostra
-  schermata error con bottone Riprova - funzionale ma non slick).
-- Disabilitare il bottone "+ Master" se la stanza ha gia' un master
-  connesso (visualmente, NON come security gate).
+> Da compilare al termine.
