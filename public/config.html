@@ -264,12 +264,87 @@
     <!-- Tab Importa (Folder Sync) -->
     <div id="folder-tab" class="config-content">
       <div class="config-section">
-        <h2>📁 Importa / Esporta cartella</h2>
+        <h2>📁 Importa dati locali</h2>
         <p style="color: var(--text-light); margin-bottom: 16px; line-height: 1.6;">
-          Punta l'app a <strong>una cartella locale</strong> (anche dentro <strong>OneDrive</strong>, <strong>Google Drive</strong> o <strong>Dropbox</strong> sincronizzata sul PC).
-          L'app legge e scrive li' usando una struttura standard, cosi' puoi <strong>condividere personaggi e stanze tra piu' PC</strong> senza configurare niente.
-          <br><strong>Vantaggi</strong>: zero OAuth, zero credenziali Microsoft/Google, zero quota limitata, funziona anche offline.
+          Indica all'app <strong>fino a 3 sorgenti separate</strong> sul tuo computer (o telefono):
+          una cartella di <strong>immagini</strong>, una cartella di <strong>stanze</strong>, e un file
+          <strong>libreria</strong> (config.json) con personaggi ed effetti. L'app fa una <strong>copia in locale</strong>
+          dei dati e da quel momento gioca con la copia: la sorgente <strong>non viene mai modificata</strong>.
+          <br><br>
+          Quando importi di nuovo: i file con <strong>stesso nome</strong> vengono sovrascritti, quelli con
+          nome diverso si aggiungono a quelli gia' presenti. Le stanze con stesso ID chiedono conferma.
         </p>
+
+        <!-- ===== Nuova UI 3-sorgenti (2026-05) ===== -->
+        <div id="sources-card" class="folder-card" style="background: linear-gradient(135deg, rgba(212,175,55,0.10), rgba(0,0,0,0.20)); border: 1px solid rgba(212,175,55,0.45); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+          <h3 style="color: var(--accent-gold); margin-bottom: 8px;">🎯 Tre sorgenti separate</h3>
+
+          <details style="margin-bottom: 14px;">
+            <summary style="cursor: pointer; color: var(--accent-gold); font-size: 0.9rem;">📋 Come deve essere strutturata la sorgente (clicca)</summary>
+            <pre style="background: var(--bg-light); padding: 10px; border-radius: 6px; color: var(--text-light); font-size: 0.8rem; overflow-x: auto; margin-top: 8px; line-height: 1.4;"><code><strong>Cartella IMMAGINI</strong> (con sub-cartelle)
+&lt;cartella&gt;/
+├── heroes/    *.png *.jpg *.webp ...
+├── enemies/
+├── allies/
+└── summons/
+
+<strong>Cartella STANZE</strong>
+&lt;cartella&gt;/
+├── &lt;id-stanza-1&gt;.json   (esportato dall'app)
+├── &lt;id-stanza-2&gt;.json
+└── ...
+
+<strong>File LIBRERIA</strong> (singolo)
+config.json   (struttura: heroes, enemies, allies, summons, effects)</code></pre>
+          </details>
+
+          <!-- Riga IMMAGINI -->
+          <div class="source-row" style="display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; margin-bottom: 10px;">
+            <label style="flex: 0 0 130px; align-self: center; color: var(--text-light); font-weight: 500;">🖼️ Immagini</label>
+            <input type="text" id="src-images-path" placeholder="(opzionale) cartella con sub heroes/, enemies/, allies/, summons/" style="flex: 1 1 280px; min-width: 0; padding: 8px 10px; background: var(--bg-light); border: 1px solid var(--border-gold); border-radius: 4px; color: var(--text-light); font-size: 0.9rem;" />
+            <button class="btn secondary tiny" id="src-images-pick" style="flex: 0 0 auto;">📁 Sfoglia</button>
+            <button class="btn secondary tiny" id="src-images-clear" style="flex: 0 0 auto;" title="Rimuovi puntamento">✖️</button>
+          </div>
+          <div id="src-images-status" class="src-status" style="margin: -4px 0 12px 138px; font-size: 0.82rem; color: var(--text-dim);"></div>
+
+          <!-- Riga STANZE -->
+          <div class="source-row" style="display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; margin-bottom: 10px;">
+            <label style="flex: 0 0 130px; align-self: center; color: var(--text-light); font-weight: 500;">🏰 Stanze</label>
+            <input type="text" id="src-rooms-path" placeholder="(opzionale) cartella con file <id>.json di stanze esportate" style="flex: 1 1 280px; min-width: 0; padding: 8px 10px; background: var(--bg-light); border: 1px solid var(--border-gold); border-radius: 4px; color: var(--text-light); font-size: 0.9rem;" />
+            <button class="btn secondary tiny" id="src-rooms-pick" style="flex: 0 0 auto;">📁 Sfoglia</button>
+            <button class="btn secondary tiny" id="src-rooms-clear" style="flex: 0 0 auto;" title="Rimuovi puntamento">✖️</button>
+          </div>
+          <div id="src-rooms-status" class="src-status" style="margin: -4px 0 12px 138px; font-size: 0.82rem; color: var(--text-dim);"></div>
+
+          <!-- Riga LIBRERIA -->
+          <div class="source-row" style="display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; margin-bottom: 10px;">
+            <label style="flex: 0 0 130px; align-self: center; color: var(--text-light); font-weight: 500;">⚙️ Libreria</label>
+            <input type="text" id="src-library-path" placeholder="(opzionale) file singolo es. config.json (personaggi + effetti)" style="flex: 1 1 280px; min-width: 0; padding: 8px 10px; background: var(--bg-light); border: 1px solid var(--border-gold); border-radius: 4px; color: var(--text-light); font-size: 0.9rem;" />
+            <button class="btn secondary tiny" id="src-library-pick" style="flex: 0 0 auto;">📄 Sfoglia</button>
+            <button class="btn secondary tiny" id="src-library-clear" style="flex: 0 0 auto;" title="Rimuovi puntamento">✖️</button>
+          </div>
+          <div id="src-library-status" class="src-status" style="margin: -4px 0 12px 138px; font-size: 0.82rem; color: var(--text-dim);"></div>
+
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px;">
+            <button class="btn primary large" id="src-import-btn">📥 Importa da queste sorgenti</button>
+            <button class="btn secondary" id="src-save-btn">💾 Salva puntamenti</button>
+          </div>
+          <p style="color: var(--text-dim); font-size: 0.82rem; margin-top: 10px; line-height: 1.5;">
+            I puntamenti vengono ricordati. L'app salva tutti i dati importati nella propria cartella di lavoro
+            (<code id="src-data-dir-hint">app-data</code>): i file della sorgente <strong>non vengono mai modificati</strong>.
+          </p>
+        </div>
+
+        <!-- ===== Sezione "modalita' classica" cartella unica (mantenuta per chi la usa) ===== -->
+        <details style="margin-bottom: 20px;">
+          <summary style="cursor: pointer; color: var(--text-dim); font-size: 0.9rem; padding: 6px 0;">
+            ⚙️ Modalita' classica: cartella unica (sincronizza un'unica cartella OneDrive/Drive)
+          </summary>
+          <div style="margin-top: 12px;">
+            <p style="color: var(--text-dim); font-size: 0.85rem; line-height: 1.5; margin-bottom: 12px;">
+              Punta l'app a <strong>un'unica cartella locale</strong> (anche dentro OneDrive/Drive sincronizzato dall'OS).
+              L'app legge/scrive li' usando una struttura standard.
+            </p>
 
         <!-- Popola cartella di lavoro: un solo click -->
         <div class="folder-card" style="background: linear-gradient(135deg, rgba(212,175,55,0.10), rgba(0,0,0,0.20)); border: 1px solid rgba(212,175,55,0.45); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
@@ -332,6 +407,10 @@
             e accedere agli stessi dati da casa, ufficio, portatile.
           </p>
         </details>
+
+          </div>
+        </details>
+        <!-- /Modalita' classica -->
 
         <!-- Modal conflitti import -->
         <div id="folder-import-modal" class="modal" style="display: none;">

@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Folder picker per Importa/Esporta cartella sincronizzata
   pickFolder: (opts) => ipcRenderer.invoke('folder:pick', opts || {}),
+  // File picker per il file singolo "config.json" della libreria
+  pickFile: (opts) => ipcRenderer.invoke('folder:pick-file', opts || {}),
   
   // Eventi
   onServerStarted: (callback) => ipcRenderer.on('server-started', (event, data) => callback(data)),

@@ -1,5 +1,6 @@
 // Endpoint REST per la feature "Importa cartella".
 //
+// API "vecchia" (cartella unica, mantenuta per retro-compat):
 //   GET    /api/folder/status            stato corrente (path, lastImport, lastExport, autoExport)
 //   POST   /api/folder/config            { folderPath, autoExport } -> aggiorna config
 //   POST   /api/folder/test              { folderPath } -> verifica scrittura
@@ -7,9 +8,16 @@
 //   POST   /api/folder/import            { folderPath, resolutions } -> applica import
 //   POST   /api/folder/export            { folderPath } -> esporta (folderPath opzionale, usa quello salvato)
 //
+// API "nuova" 2026-05 (3 sorgenti indipendenti):
+//   POST   /api/folder/sources           { imagesPath?, roomsPath?, libraryPath? } -> set
+//   GET    /api/folder/sources           -> get correnti + stato file/cartella (esiste? scrivibile?)
+//   POST   /api/folder/analyze-sources   { imagesPath?, roomsPath?, libraryPath? } -> preview
+//   POST   /api/folder/import-sources    { imagesPath?, roomsPath?, libraryPath?, resolutions? }
+//
 // Espone anche scheduleAutoExport() che il config-store / room-manager possono chiamare.
 
 const path = require('path');
+const fs = require('fs');
 const { FolderStore } = require('./folder-store');
 const folderSync = require('./folder-sync');
 
@@ -170,6 +178,97 @@ function registerFolderRoutes(app, paths, configStore, db) {
     try {
       const result = await folderSync.exportFolder(folderPath, deps);
       store.update(c => { c.lastExportAt = Date.now(); return c; });
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ===== API NUOVA (3 sorgenti indipendenti) =====
+
+  // Helper: testa se un path esiste / è leggibile / e' del tipo giusto.
+  function probePath(p, kind /* 'dir'|'file' */) {
+    if (!p) return { path: null, ok: null, missing: false, message: 'non configurato' };
+    try {
+      if (!fs.existsSync(p)) return { path: p, ok: false, missing: true, message: 'non esiste' };
+      const st = fs.statSync(p);
+      if (kind === 'dir' && !st.isDirectory()) return { path: p, ok: false, missing: false, message: 'non e\' una cartella' };
+      if (kind === 'file' && !st.isFile()) return { path: p, ok: false, missing: false, message: 'non e\' un file' };
+      return { path: p, ok: true, missing: false };
+    } catch (e) {
+      return { path: p, ok: false, missing: false, message: e.message };
+    }
+  }
+
+  app.get('/api/folder/sources', (req, res) => {
+    const cfg = store.load();
+    res.json({
+      sources: {
+        imagesPath: cfg.imagesPath || null,
+        roomsPath: cfg.roomsPath || null,
+        libraryPath: cfg.libraryPath || null
+      },
+      probes: {
+        images: probePath(cfg.imagesPath, 'dir'),
+        rooms: probePath(cfg.roomsPath, 'dir'),
+        library: probePath(cfg.libraryPath, 'file')
+      },
+      lastImportAt: cfg.lastImportAt,
+      lastExportAt: cfg.lastExportAt,
+      autoExport: cfg.autoExport
+    });
+  });
+
+  app.post('/api/folder/sources', (req, res) => {
+    const body = req.body || {};
+    const next = store.update(c => {
+      // Solo i campi presenti vengono aggiornati. Per cancellare un puntamento
+      // si manda esplicitamente "" (stringa vuota) che verra' normalizzata a null.
+      if ('imagesPath' in body) c.imagesPath = (body.imagesPath || '').toString().trim() || null;
+      if ('roomsPath' in body) c.roomsPath = (body.roomsPath || '').toString().trim() || null;
+      if ('libraryPath' in body) c.libraryPath = (body.libraryPath || '').toString().trim() || null;
+      return c;
+    });
+    res.json({ success: true, sources: { imagesPath: next.imagesPath, roomsPath: next.roomsPath, libraryPath: next.libraryPath } });
+  });
+
+  app.post('/api/folder/analyze-sources', (req, res) => {
+    const body = req.body || {};
+    const cfg = store.load();
+    const sources = {
+      imagesPath: body.imagesPath || cfg.imagesPath || null,
+      roomsPath: body.roomsPath || cfg.roomsPath || null,
+      libraryPath: body.libraryPath || cfg.libraryPath || null
+    };
+    try {
+      const analysis = folderSync.analyzeImportSources(sources, deps);
+      res.json(analysis);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post('/api/folder/import-sources', async (req, res) => {
+    const body = req.body || {};
+    const cfg = store.load();
+    const sources = {
+      imagesPath: body.imagesPath || cfg.imagesPath || null,
+      roomsPath: body.roomsPath || cfg.roomsPath || null,
+      libraryPath: body.libraryPath || cfg.libraryPath || null
+    };
+    const resolutions = body.resolutions || {};
+    try {
+      const result = await folderSync.applyImportSources(sources, deps, resolutions);
+      store.update(c => {
+        c.lastImportAt = Date.now();
+        // Salva i path usati come "ultimi configurati" anche se passati ad-hoc nel body.
+        if (body.persist !== false) {
+          if (sources.imagesPath) c.imagesPath = sources.imagesPath;
+          if (sources.roomsPath) c.roomsPath = sources.roomsPath;
+          if (sources.libraryPath) c.libraryPath = sources.libraryPath;
+        }
+        return c;
+      });
       res.json(result);
     } catch (e) {
       res.status(500).json({ error: e.message });

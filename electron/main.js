@@ -265,10 +265,26 @@ function setupIPCHandlers() {
       title: opts.title || 'Popola cartella di lavoro',
       defaultPath,
       properties: ['openDirectory', 'createDirectory'],
-      buttonLabel: 'Usa questa cartella'
+      buttonLabel: opts.buttonLabel || 'Usa questa cartella'
     });
     if (result.canceled || !result.filePaths.length) return { canceled: true };
     return { canceled: false, folderPath: result.filePaths[0] };
+  });
+
+  // File picker per scegliere UN file singolo (es. config.json della libreria).
+  // opts: { title?, defaultPath?, filters? } — i filters seguono la convenzione
+  // di Electron dialog (es. [{ name: 'JSON', extensions: ['json'] }]).
+  ipcMain.handle('folder:pick-file', async (event, opts = {}) => {
+    const defaultPath = opts.defaultPath || (server && server.paths && server.paths.dataDir) || undefined;
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: opts.title || 'Scegli un file',
+      defaultPath,
+      properties: ['openFile'],
+      filters: opts.filters || [{ name: 'Tutti i file', extensions: ['*'] }],
+      buttonLabel: opts.buttonLabel || 'Usa questo file'
+    });
+    if (result.canceled || !result.filePaths.length) return { canceled: true };
+    return { canceled: false, filePath: result.filePaths[0] };
   });
 }
 

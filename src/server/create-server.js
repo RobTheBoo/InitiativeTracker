@@ -101,7 +101,9 @@ function createServer(opts = {}) {
       // URL pronto da mostrare in QR (preferisce mDNS hostname per stabilita')
       playerUrl: `http://${primaryIp}:${port}/`,
       tabletUrl: `http://${primaryIp}:${port}/tablet.html`,
-      version: appVersion
+      version: appVersion,
+      // Cartella di lavoro locale (per UI "Importa": l'app salva i dati qui).
+      dataDir: paths.dataDir
     });
   });
 

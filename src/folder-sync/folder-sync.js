@@ -408,6 +408,269 @@ async function applyImport(folderPath, deps, resolutions = {}) {
   return result;
 }
 
+// ========== IMPORT (3 sorgenti indipendenti) ==========
+
+/**
+ * Variante di analyzeImport che accetta 3 path indipendenti.
+ * Ogni path puo' essere null/undefined: la sezione corrispondente viene saltata.
+ *
+ * sources = { imagesPath, roomsPath, libraryPath }
+ *   - imagesPath:  cartella con sub heroes/enemies/allies/summons (PNG/JPG)
+ *   - roomsPath:   cartella con file <id>.json (uno per stanza)
+ *   - libraryPath: file singolo config.json (heroes/enemies/allies/summons/effects)
+ *
+ * NB: la sorgente non viene MAI modificata. L'app fa solo lettura qui.
+ *
+ * Returns: {
+ *   sources, hasImages, hasRooms, hasLibrary,
+ *   imageCount, imagesPerSub, configCounts,
+ *   rooms: [{id, name, exists, hasGameState, action}],
+ *   warnings: [string], blockers: [string], canImport: bool
+ * }
+ */
+function analyzeImportSources(sources, deps) {
+  const { imagesPath, roomsPath, libraryPath } = sources || {};
+  const { db } = deps;
+  const out = {
+    sources: { imagesPath: imagesPath || null, roomsPath: roomsPath || null, libraryPath: libraryPath || null },
+    hasImages: false,
+    hasRooms: false,
+    hasLibrary: false,
+    imageCount: 0,
+    imagesPerSub: {},
+    configCounts: null,
+    rooms: [],
+    warnings: [],
+    blockers: [],
+    canImport: true
+  };
+
+  // 1. immagini (cartella opzionale)
+  if (imagesPath) {
+    if (!fs.existsSync(imagesPath) || !fs.statSync(imagesPath).isDirectory()) {
+      out.blockers.push(`Cartella immagini non trovata: ${imagesPath}`);
+    } else {
+      out.hasImages = true;
+      // Conta immagini per sub-cartella conosciuta. Se non ci sono sub
+      // standard, contiamo i PNG/JPG a livello root come "heroes" di default.
+      let foundSubs = 0;
+      for (const sub of SUBFOLDERS) {
+        const subDir = path.join(imagesPath, sub);
+        if (fs.existsSync(subDir) && fs.statSync(subDir).isDirectory()) {
+          const n = fs.readdirSync(subDir).filter(f => IMAGE_EXTS.includes(path.extname(f).toLowerCase())).length;
+          out.imagesPerSub[sub] = n;
+          out.imageCount += n;
+          foundSubs++;
+        } else {
+          out.imagesPerSub[sub] = 0;
+        }
+      }
+      if (foundSubs === 0) {
+        // Fallback: file flat a livello root → li considereremo come heroes.
+        const flatImgs = fs.readdirSync(imagesPath).filter(f => IMAGE_EXTS.includes(path.extname(f).toLowerCase()));
+        if (flatImgs.length > 0) {
+          out.imagesPerSub.heroes = flatImgs.length;
+          out.imageCount = flatImgs.length;
+          out.warnings.push(`Cartella immagini senza sub heroes/enemies/allies/summons: i ${flatImgs.length} file verranno importati come "heroes".`);
+        } else {
+          out.warnings.push('Cartella immagini vuota o senza file PNG/JPG riconosciuti.');
+        }
+      }
+    }
+  }
+
+  // 2. stanze (cartella opzionale)
+  if (roomsPath) {
+    if (!fs.existsSync(roomsPath) || !fs.statSync(roomsPath).isDirectory()) {
+      out.blockers.push(`Cartella stanze non trovata: ${roomsPath}`);
+    } else {
+      out.hasRooms = true;
+      const existingIds = new Set(db.getAllRooms().map(r => r.id));
+      let invalidRoomFiles = 0;
+      for (const file of fs.readdirSync(roomsPath)) {
+        if (!file.endsWith('.json')) continue;
+        try {
+          const payload = JSON.parse(fs.readFileSync(path.join(roomsPath, file), 'utf8'));
+          const room = payload.room || {};
+          if (!room.id) { invalidRoomFiles++; continue; }
+          out.rooms.push({
+            id: room.id,
+            name: room.name || room.id,
+            file,
+            exists: existingIds.has(room.id),
+            hasGameState: !!payload.gameState,
+            action: existingIds.has(room.id) ? 'ask' : 'create'
+          });
+        } catch (_) { invalidRoomFiles++; }
+      }
+      if (invalidRoomFiles) {
+        out.warnings.push(`${invalidRoomFiles} file rooms/*.json invalidi o senza room.id (verranno saltati).`);
+      }
+      if (out.rooms.length === 0 && invalidRoomFiles === 0) {
+        out.warnings.push('Cartella stanze vuota.');
+      }
+    }
+  }
+
+  // 3. libreria personaggi+effetti (FILE singolo opzionale)
+  if (libraryPath) {
+    if (!fs.existsSync(libraryPath) || !fs.statSync(libraryPath).isFile()) {
+      out.blockers.push(`File libreria non trovato: ${libraryPath}`);
+    } else {
+      try {
+        const cfg = JSON.parse(fs.readFileSync(libraryPath, 'utf8'));
+        out.hasLibrary = true;
+        out.configCounts = {
+          heroes: Array.isArray(cfg.heroes) ? cfg.heroes.length : 0,
+          enemies: Array.isArray(cfg.enemies) ? cfg.enemies.length : 0,
+          allies: Array.isArray(cfg.allies) ? cfg.allies.length : 0,
+          summons: Array.isArray(cfg.summons) ? cfg.summons.length : 0,
+          effects: Array.isArray(cfg.effects) ? cfg.effects.length : 0
+        };
+      } catch (e) {
+        out.blockers.push('File libreria non e\' un JSON valido: ' + e.message);
+      }
+    }
+  }
+
+  // 4. nessuna sorgente → blocker
+  if (!imagesPath && !roomsPath && !libraryPath) {
+    out.blockers.push('Nessuna sorgente specificata. Indica almeno una fra cartella immagini, cartella stanze, file libreria.');
+  }
+
+  out.canImport = out.blockers.length === 0;
+  return out;
+}
+
+/**
+ * Variante di applyImport che lavora sui 3 path indipendenti.
+ *
+ * resolutions: { roomId: 'overwrite'|'skip'|'create' } come nella vecchia API.
+ *
+ * Comportamento "stesso nome → sovrascrive, nome diverso → aggiunge":
+ *  - immagini: copyFile sempre (sovrascrive se gia' esiste). File con nome
+ *    diverso si aggiungono a quelli locali.
+ *  - libreria: merge per id (incoming sovrascrive il record locale con stesso id;
+ *    record nuovi vengono aggiunti).
+ *  - stanze: chiede via resolutions[roomId] per gli id duplicati;
+ *    nuovi id si aggiungono.
+ *
+ * NB: NON modifica i file/cartelle sorgente. Tutto viene scritto in app-data.
+ *
+ * Returns: {
+ *   sources, configImported,
+ *   images: {copied, errors},
+ *   rooms: {created, overwritten, skipped, errors}
+ * }
+ */
+async function applyImportSources(sources, deps, resolutions = {}) {
+  const { imagesPath, roomsPath, libraryPath } = sources || {};
+  const { paths: appPaths, configStore, db } = deps;
+  const result = {
+    sources: { imagesPath: imagesPath || null, roomsPath: roomsPath || null, libraryPath: libraryPath || null },
+    configImported: false,
+    images: { copied: 0, errors: [] },
+    rooms: { created: 0, overwritten: 0, skipped: 0, errors: [] }
+  };
+
+  // 1. libreria
+  if (libraryPath && fs.existsSync(libraryPath) && fs.statSync(libraryPath).isFile()) {
+    try {
+      const incoming = JSON.parse(fs.readFileSync(libraryPath, 'utf8'));
+      configStore.update(c => {
+        for (const key of ['heroes', 'enemies', 'allies', 'summons', 'effects']) {
+          const local = Array.isArray(c[key]) ? c[key] : [];
+          const remote = Array.isArray(incoming[key]) ? incoming[key] : [];
+          const map = new Map(local.map(x => [x.id, x]));
+          for (const item of remote) {
+            if (item && item.id) map.set(item.id, { ...map.get(item.id), ...item });
+          }
+          c[key] = Array.from(map.values());
+        }
+        return c;
+      });
+      if (typeof configStore.flush === 'function') configStore.flush();
+      result.configImported = true;
+    } catch (e) {
+      throw new Error('Lettura libreria fallita: ' + e.message);
+    }
+  }
+
+  // 2. immagini
+  if (imagesPath && fs.existsSync(imagesPath) && fs.statSync(imagesPath).isDirectory()) {
+    // Controlla se ci sono sub heroes/enemies/etc; altrimenti tratta tutto come heroes (vedi analyze).
+    const hasStandardSubs = SUBFOLDERS.some(s => fs.existsSync(path.join(imagesPath, s)));
+    if (hasStandardSubs) {
+      for (const sub of SUBFOLDERS) {
+        const srcDir = path.join(imagesPath, sub);
+        const dstDir = appPaths.getImagesPath(sub);
+        if (!fs.existsSync(srcDir)) continue;
+        for (const file of fs.readdirSync(srcDir)) {
+          const ext = path.extname(file).toLowerCase();
+          if (!IMAGE_EXTS.includes(ext)) continue;
+          try {
+            copyFileSafe(path.join(srcDir, file), path.join(dstDir, file));
+            result.images.copied++;
+          } catch (e) {
+            result.images.errors.push({ file: `${sub}/${file}`, error: e.message });
+          }
+        }
+      }
+    } else {
+      // Flat: tutto in heroes/
+      const dstDir = appPaths.getImagesPath('heroes');
+      for (const file of fs.readdirSync(imagesPath)) {
+        const ext = path.extname(file).toLowerCase();
+        if (!IMAGE_EXTS.includes(ext)) continue;
+        try {
+          copyFileSafe(path.join(imagesPath, file), path.join(dstDir, file));
+          result.images.copied++;
+        } catch (e) {
+          result.images.errors.push({ file, error: e.message });
+        }
+      }
+    }
+  }
+
+  // 3. stanze
+  if (roomsPath && fs.existsSync(roomsPath) && fs.statSync(roomsPath).isDirectory()) {
+    const existingIds = new Set(db.getAllRooms().map(r => r.id));
+    for (const file of fs.readdirSync(roomsPath)) {
+      if (!file.endsWith('.json')) continue;
+      try {
+        const payload = JSON.parse(fs.readFileSync(path.join(roomsPath, file), 'utf8'));
+        const room = payload.room || {};
+        if (!room.id) continue;
+        const exists = existingIds.has(room.id);
+        const decision = resolutions[room.id] || (exists ? 'skip' : 'create');
+
+        if (exists && decision === 'skip') {
+          result.rooms.skipped++;
+          continue;
+        }
+        if (exists && decision === 'overwrite') {
+          if (payload.gameState) db.saveRoomState(room.id, payload.gameState);
+          const updates = {};
+          if (room.name) updates.name = room.name;
+          if (room.status) updates.status = room.status;
+          if (typeof room.current_round === 'number') updates.current_round = room.current_round;
+          if (typeof room.combat_started === 'number') updates.combat_started = room.combat_started;
+          if (Object.keys(updates).length) db.updateRoom(room.id, updates);
+          result.rooms.overwritten++;
+        } else {
+          if (!exists) db.createRoom(room.id, room.name || 'Stanza importata');
+          if (payload.gameState) db.saveRoomState(room.id, payload.gameState);
+          result.rooms.created++;
+        }
+      } catch (e) {
+        result.rooms.errors.push({ file, error: e.message });
+      }
+    }
+  }
+
+  return result;
+}
+
 // ========== HELPERS ==========
 
 function safeFilename(s) {
@@ -465,6 +728,8 @@ module.exports = {
   exportFolder,
   analyzeImport,
   applyImport,
+  analyzeImportSources,
+  applyImportSources,
   MANIFEST_VERSION,
   SUBFOLDERS
 };

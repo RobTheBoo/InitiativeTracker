@@ -166,3 +166,94 @@ server nativo dentro il telefono Master quando l'utente tappa "🎭 Sono il Mast
 - `RangeError: Too few parameter values were provided` — era nel test E2E,
   passavo un object al socket.io event `joinRoom` che si aspetta una stringa.
   Test client aggiornato in `dist/test-e2e-socket.js`.
+
+---
+
+# 3-Source Local Import (Windows + APK) — Piano
+
+> **Decisione 2026-05-20**: l'utente vuole tre input separati (immagini, stanze,
+> libreria personaggi+effetti) sia su Windows che su APK. Niente OneDrive /
+> WebDAV / cloud. Cartelle locali punto e basta. La sorgente NON viene MAI
+> modificata: l'app fa "import = copia in app-data", poi gioca dalla copia
+> locale (questo e' gia' il comportamento attuale).
+
+## Obiettivo
+
+Sostituire l'attuale flow "una cartella unica con sub-cartelle" con tre
+puntamenti indipendenti:
+
+1. **Cartella IMMAGINI** (con sub `heroes/`, `enemies/`, `allies/`, `summons/`)
+2. **Cartella STANZE** (con file `<id>.json` per ogni stanza)
+3. **File LIBRERIA** (`config.json` con heroes/enemies/allies/summons/effects)
+
+Ogni puntamento opzionale e indipendente. UI:
+- Su Windows / Electron: 3 input testuali + 3 bottoni "Sfoglia" (dialog nativo)
+- Su APK Capacitor: 3 input + 3 bottoni "Aggiungi file/cartella" (file picker
+  Android via plugin)
+
+## Step
+
+### Step A — Backend (refactor folder-sync) — 2-3h
+
+- [x] **A1**: `folder-store.js`: schema {`imagesPath`, `roomsPath`, `libraryPath`}.
+  Backward compat con `folderPath` legacy via `migrateLegacy(cfg)`.
+- [x] **A2**: `folder-sync.js`: nuove `analyzeImportSources(sources, deps)` e
+  `applyImportSources(sources, deps, resolutions)` che lavorano sui 3 path
+  indipendenti. La sorgente NON viene mai scritta. Vecchie API mantenute.
+- [x] **A3**: `folder-routes.js`: nuovi endpoint
+  - `GET  /api/folder/sources` (con probe esistenza/tipo)
+  - `POST /api/folder/sources` { imagesPath?, roomsPath?, libraryPath? }
+  - `POST /api/folder/analyze-sources`
+  - `POST /api/folder/import-sources`
+- [x] **A bonus**: `/api/server-info` ora restituisce anche `dataDir` per
+  hint UI "i dati vengono salvati qui".
+
+### Step B — Frontend Electron — 2-3h
+
+- [x] **B1**: `electron/main.js` + `preload.js`: aggiunto handler
+  `folder:pick-file` (per il file singolo `config.json`) accanto a `folder:pick`.
+- [x] **B2**: `public/config.html`: nuova sezione "Importa dati locali" con:
+  - Box informativo + spiegazione struttura.
+  - 3 righe input + Sfoglia + Clear:
+    - 🖼️ Immagini → `pickFolder()`
+    - 🏰 Stanze → `pickFolder()`
+    - ⚙️ Libreria → `pickFile()` (filter JSON)
+  - Bottone "Importa da queste sorgenti" + "Salva puntamenti".
+- [x] **B3**: la vecchia UI "una cartella unica" e' stata nascosta sotto
+  `<details>` "Modalita' classica: cartella unica" per chi gia' la usa.
+
+**Verifiche backend (2026-05-20)**:
+- E2E con server headless + cartelle/file fittizi:
+  - GET /api/folder/sources -> sources null + probes.
+  - POST /api/folder/sources -> set 3 path.
+  - GET di nuovo -> probes ok=true per tutti e 3.
+  - POST /api/folder/analyze-sources -> imageCount: 2, configCounts ok,
+    rooms.length: 1, canImport: true.
+  - POST /api/folder/import-sources -> configImported=true, images.copied=2,
+    rooms.created=1, sorgente non toccata.
+
+### Step C — APK Capacitor — 4-5h
+
+- [ ] **C1**: `npm install @capawesome/capacitor-file-picker` (file picker
+  multi-select PNG/JPG e JSON).
+- [ ] **C2**: server endpoint `POST /api/folder/upload` (multipart) che
+  accetta file + tipo (`image`/`room`/`library`) e li scrive in app-data.
+- [ ] **C3**: in `config.html`, quando `window.isCapacitorApp`, sostituire
+  il bottone "Sfoglia" con "Aggiungi file" (multi-select) che:
+  - Per immagini: legge i file via Filesystem.readFile, POST multipart al server.
+  - Per stanze: idem (json).
+  - Per config: idem (singolo json).
+- [ ] **C4**: feedback UI: progress bar per file count grossi (immagini > 50).
+
+### Step D — Test E2E + commit — 1-2h
+
+- [ ] **D1**: Electron: import da 3 cartelle separate, verifica che immagini
+  appaiano in app-data, stanze nel DB, library mergata.
+- [ ] **D2**: APK emulator: idem via file picker.
+- [ ] **D3**: commit + push + lessons.
+
+**Stima totale: 9-13h**
+
+## Review
+
+> Da compilare al termine.

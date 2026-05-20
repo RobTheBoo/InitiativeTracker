@@ -467,6 +467,220 @@
     modal.style.display = 'flex';
   }
 
+  // ============================================================
+  // ===== UI 3-sorgenti (2026-05) ==============================
+  // ============================================================
+
+  // Mostra il "probe" come riga di stato sotto ogni input.
+  function setSrcStatus(elId, probe, kind) {
+    const el = $(elId);
+    if (!el) return;
+    if (!probe || probe.path === null) {
+      el.textContent = ''; // niente puntamento
+      el.style.color = 'var(--text-dim)';
+      return;
+    }
+    if (probe.ok === true) {
+      el.textContent = '✅ ' + (kind === 'file' ? 'File trovato' : 'Cartella trovata');
+      el.style.color = 'var(--text-light)';
+    } else {
+      const msg = probe.missing ? 'Path non esiste' : (probe.message || 'non utilizzabile');
+      el.textContent = '⚠️ ' + msg;
+      el.style.color = '#ff9b6b';
+    }
+  }
+
+  async function refreshSources() {
+    if (!$('src-images-path')) return; // UI assente in pagine vecchie
+    try {
+      const s = await apiGet('/api/folder/sources');
+      $('src-images-path').value = s.sources.imagesPath || '';
+      $('src-rooms-path').value = s.sources.roomsPath || '';
+      $('src-library-path').value = s.sources.libraryPath || '';
+      setSrcStatus('src-images-status', s.probes.images, 'dir');
+      setSrcStatus('src-rooms-status', s.probes.rooms, 'dir');
+      setSrcStatus('src-library-status', s.probes.library, 'file');
+
+      // Hint con il path della cartella di lavoro dell'app.
+      try {
+        const info = await apiGet('/api/server-info');
+        if (info && info.dataDir && $('src-data-dir-hint')) {
+          $('src-data-dir-hint').textContent = info.dataDir;
+        }
+      } catch (_) {}
+    } catch (e) {
+      console.warn('refreshSources fallito:', e.message);
+    }
+  }
+
+  async function pickSourceFolder(inputId, statusId) {
+    if (!isElectron) {
+      alert('Su questa piattaforma non e\' disponibile lo Sfoglia: incolla il path a mano nel campo, poi premi Salva.');
+      return;
+    }
+    try {
+      const r = await window.electronAPI.pickFolder({
+        title: 'Scegli la cartella sorgente',
+        defaultPath: $(inputId).value || undefined,
+        buttonLabel: 'Usa questa cartella'
+      });
+      if (r && !r.canceled && r.folderPath) {
+        $(inputId).value = r.folderPath;
+        // Salviamo subito cosi' il prossimo refresh probe lo trova.
+        await saveSources();
+      }
+    } catch (e) {
+      alert('Errore selezione cartella: ' + e.message);
+    }
+  }
+
+  async function pickSourceFile(inputId, statusId) {
+    if (!isElectron) {
+      alert('Su questa piattaforma non e\' disponibile lo Sfoglia: incolla il path a mano nel campo, poi premi Salva.');
+      return;
+    }
+    if (typeof window.electronAPI.pickFile !== 'function') {
+      alert('Questa versione dell\'app non supporta la selezione file. Aggiorna il preload.js.');
+      return;
+    }
+    try {
+      const r = await window.electronAPI.pickFile({
+        title: 'Scegli il file libreria (config.json)',
+        defaultPath: $(inputId).value || undefined,
+        filters: [{ name: 'JSON', extensions: ['json'] }, { name: 'Tutti i file', extensions: ['*'] }],
+        buttonLabel: 'Usa questo file'
+      });
+      if (r && !r.canceled && r.filePath) {
+        $(inputId).value = r.filePath;
+        await saveSources();
+      }
+    } catch (e) {
+      alert('Errore selezione file: ' + e.message);
+    }
+  }
+
+  async function saveSources() {
+    try {
+      await apiPost('/api/folder/sources', {
+        imagesPath: $('src-images-path').value.trim(),
+        roomsPath: $('src-rooms-path').value.trim(),
+        libraryPath: $('src-library-path').value.trim()
+      });
+      await refreshSources();
+    } catch (e) {
+      alert('Errore salvataggio puntamenti: ' + e.message);
+    }
+  }
+
+  async function clearSource(field) {
+    const inputMap = { imagesPath: 'src-images-path', roomsPath: 'src-rooms-path', libraryPath: 'src-library-path' };
+    $(inputMap[field]).value = '';
+    await apiPost('/api/folder/sources', { [field]: '' });
+    await refreshSources();
+  }
+
+  async function importFromSources() {
+    const sources = {
+      imagesPath: $('src-images-path').value.trim(),
+      roomsPath: $('src-rooms-path').value.trim(),
+      libraryPath: $('src-library-path').value.trim()
+    };
+    if (!sources.imagesPath && !sources.roomsPath && !sources.libraryPath) {
+      alert('Indica almeno una sorgente (immagini, stanze o libreria) prima di importare.');
+      return;
+    }
+    let analysis;
+    try {
+      analysis = await apiPost('/api/folder/analyze-sources', sources);
+    } catch (e) {
+      showResultModal('❌ Analisi fallita', e.message);
+      return;
+    }
+
+    if (!analysis.canImport) {
+      showResultModal('❌ Non e\' possibile importare', (analysis.blockers || []).join('\n') || 'Errore sconosciuto');
+      return;
+    }
+
+    // Riusa il modal "folder-import-modal" della UI vecchia: stessa logica conflitti stanze.
+    const sumLines = [];
+    if (analysis.hasImages) {
+      const subs = Object.entries(analysis.imagesPerSub).filter(([, n]) => n > 0).map(([s, n]) => `${s}: ${n}`).join(', ');
+      sumLines.push(`🖼️ <strong>${analysis.imageCount}</strong> immagini ${subs ? '(' + subs + ')' : ''}`);
+    }
+    if (analysis.hasLibrary && analysis.configCounts) {
+      const cc = analysis.configCounts;
+      sumLines.push(`⚙️ Libreria: ${cc.heroes} eroi, ${cc.enemies} nemici, ${cc.allies} alleati, ${cc.summons} evocazioni, ${cc.effects} effetti`);
+    }
+    if (analysis.hasRooms) {
+      const newRooms = analysis.rooms.filter(r => !r.exists).length;
+      const conflictRooms = analysis.rooms.filter(r => r.exists).length;
+      sumLines.push(`🏰 Stanze: ${newRooms} nuove, ${conflictRooms} con stesso ID gia' presenti`);
+    }
+    if (!sumLines.length) sumLines.push('Niente da importare in queste sorgenti.');
+    if (analysis.warnings && analysis.warnings.length) {
+      sumLines.push('');
+      sumLines.push('⚠️ ' + analysis.warnings.join('\n⚠️ '));
+    }
+
+    $('folder-import-summary').innerHTML = sumLines.join('<br>');
+
+    // Conflict list (riusa esattamente lo stesso markup della UI vecchia).
+    const conflictRooms = analysis.rooms.filter(r => r.exists);
+    const wrap = $('folder-import-conflicts-wrap');
+    const list = $('folder-import-conflicts-list');
+    if (conflictRooms.length === 0) {
+      wrap.style.display = 'none';
+      list.innerHTML = '';
+    } else {
+      wrap.style.display = '';
+      list.innerHTML = conflictRooms.map(r => `
+        <div class="folder-conflict-row" data-id="${r.id}" style="display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px dashed var(--border-gold);">
+          <span style="flex: 1; color: var(--text-light);">${r.name}</span>
+          <select class="folder-conflict-select" data-id="${r.id}" style="background: var(--bg-light); color: var(--text-light); border: 1px solid var(--border-gold); border-radius: 4px; padding: 3px 6px;">
+            <option value="overwrite">Sovrascrivi</option>
+            <option value="skip" selected>Salta</option>
+          </select>
+        </div>
+      `).join('');
+    }
+
+    // Salva sorgenti in chiusura (per il bottone Conferma).
+    $('folder-import-modal').dataset.mode = 'sources';
+    $('folder-import-modal').dataset.sources = JSON.stringify(sources);
+    $('folder-import-modal').style.display = 'flex';
+  }
+
+  async function confirmImportSources() {
+    const modal = $('folder-import-modal');
+    const sources = JSON.parse(modal.dataset.sources || '{}');
+    const resolutions = {};
+    document.querySelectorAll('.folder-conflict-select').forEach(sel => {
+      resolutions[sel.dataset.id] = sel.value;
+    });
+    modal.style.display = 'none';
+
+    try {
+      const result = await apiPost('/api/folder/import-sources', { ...sources, resolutions });
+      const lines = [
+        '✅ Import completato',
+        '',
+        `⚙️  Libreria: ${result.configImported ? 'importata' : 'non presente'}`,
+        `🖼️  Immagini: ${result.images.copied} copiate (errori: ${result.images.errors.length})`,
+        `🏰 Stanze: ${result.rooms.created} create, ${result.rooms.overwritten} sovrascritte, ${result.rooms.skipped} saltate (errori: ${result.rooms.errors.length})`,
+        '',
+        '📁 Tutto e\' stato copiato nella cartella di lavoro dell\'app.',
+        '   I file sorgente non sono stati modificati.'
+      ];
+      showResultModal('📥 Dati importati', lines.join('\n'));
+      await refreshSources();
+      // Reload pagina per rigenerare le grid (config.js carica al boot)
+      setTimeout(() => location.reload(), 1500);
+    } catch (e) {
+      showResultModal('❌ Import fallito', e.message);
+    }
+  }
+
   // ----- Bind -----
   function bind() {
     if (isElectron && $('folder-browse-btn')) {
@@ -483,9 +697,15 @@
     $('folder-import-btn').addEventListener('click', startImport);
     $('folder-export-btn').addEventListener('click', doExport);
 
-    $('folder-import-confirm-btn').addEventListener('click', confirmImport);
+    // Conferma import: gestiamo entrambi i flow ("classico" cartella unica e "sources").
+    $('folder-import-confirm-btn').addEventListener('click', () => {
+      const modal = $('folder-import-modal');
+      if (modal.dataset.mode === 'sources') confirmImportSources();
+      else confirmImport();
+    });
     $('folder-import-cancel-btn').addEventListener('click', () => {
       $('folder-import-modal').style.display = 'none';
+      $('folder-import-modal').dataset.mode = '';
     });
     $('folder-conflicts-all-overwrite').addEventListener('click', () => setAllConflicts('overwrite'));
     $('folder-conflicts-all-skip').addEventListener('click', () => setAllConflicts('skip'));
@@ -494,18 +714,34 @@
       $('folder-result-modal').style.display = 'none';
     });
 
+    // Bindings nuova UI 3-sorgenti
+    if ($('src-images-pick')) {
+      $('src-images-pick').addEventListener('click', () => pickSourceFolder('src-images-path', 'src-images-status'));
+      $('src-rooms-pick').addEventListener('click', () => pickSourceFolder('src-rooms-path', 'src-rooms-status'));
+      $('src-library-pick').addEventListener('click', () => pickSourceFile('src-library-path', 'src-library-status'));
+      $('src-images-clear').addEventListener('click', () => clearSource('imagesPath'));
+      $('src-rooms-clear').addEventListener('click', () => clearSource('roomsPath'));
+      $('src-library-clear').addEventListener('click', () => clearSource('libraryPath'));
+      $('src-save-btn').addEventListener('click', saveSources);
+      $('src-import-btn').addEventListener('click', importFromSources);
+    }
+
     // Refresh quando si apre la tab
     document.querySelectorAll('.config-tab').forEach(btn => {
       btn.addEventListener('click', () => {
-        if (btn.dataset.tab === 'folder') refreshStatus();
+        if (btn.dataset.tab === 'folder') {
+          refreshStatus();
+          refreshSources();
+        }
       });
     });
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => { bind(); refreshStatus(); });
+    document.addEventListener('DOMContentLoaded', () => { bind(); refreshStatus(); refreshSources(); });
   } else {
     bind();
     refreshStatus();
+    refreshSources();
   }
 })();
