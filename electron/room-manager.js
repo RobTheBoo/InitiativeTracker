@@ -2,6 +2,18 @@ const { generateId, calculateTurnOrder, findInitiativeTies, assignTiebreakers, r
 const path = require('path');
 const fs = require('fs');
 
+// Determina una sola volta se l'app gira come Electron packaged. Se require('electron')
+// fallisce (es. server headless o nodejs-mobile dentro l'APK), assumiamo "packaged"
+// = le immagini stanno fuori da public/, vanno servite via /api/images/*.
+function isAppPackaged() {
+  try {
+    const { app } = require('electron');
+    return !!(app && app.isPackaged);
+  } catch (_) {
+    return true;
+  }
+}
+
 class RoomManager {
   constructor(database, io, getImagesPathFn = null, loadConfigFn = null) {
     this.db = database;
@@ -419,8 +431,7 @@ class RoomManager {
     for (const ext of extensions) {
       const imagePath = path.join(basePath, imageId + ext);
       if (fs.existsSync(imagePath)) {
-        const { app } = require('electron');
-        if (app && app.isPackaged) {
+        if (isAppPackaged()) {
           return `/api/images/enemies/${imageId}${ext}`;
         }
         return `/images/enemies/${imageId}${ext}`;
@@ -519,8 +530,7 @@ class RoomManager {
     for (const ext of extensions) {
       const imagePath = path.join(basePath, imageId + ext);
       if (fs.existsSync(imagePath)) {
-        const { app } = require('electron');
-        if (app && app.isPackaged) {
+        if (isAppPackaged()) {
           return `/api/images/allies/${imageId}${ext}`;
         }
         return `/images/allies/${imageId}${ext}`;

@@ -3,14 +3,24 @@ const fs = require('fs');
 const path = require('path');
 
 class RPGDatabase {
-  constructor(dbPath, getImagesPathFn = null) {
-    // Assicurati che la directory esista
+  /**
+   * @param {string} dbPath
+   * @param {Function|null} getImagesPathFn
+   * @param {object} [dbOptions] - opzioni passate a `new Database(...)`. In
+   *   particolare per il runtime Capacitor-NodeJS su Android passiamo
+   *   { nativeBinding: '/path/to/android-{arch}/better_sqlite3.node' }
+   *   per sovrascrivere il binario nativo (il prebuilt installato da npm e'
+   *   per Windows/macOS/Linux desktop, non gira sotto nodejs-mobile).
+   */
+  constructor(dbPath, getImagesPathFn = null, dbOptions = undefined) {
     const dir = path.dirname(dbPath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    this.db = new Database(dbPath);
+    this.db = dbOptions
+      ? new Database(dbPath, dbOptions)
+      : new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
     this.getImagesPath = getImagesPathFn || ((subfolder) => path.join(__dirname, '..', 'public', 'images', subfolder));
     this.initTables();
@@ -167,16 +177,26 @@ class RPGDatabase {
   findCharacterImage(charId, type = 'heroes') {
     const extensions = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg'];
     const basePath = this.getImagesPath(type);
-    
+
+    // Determina se siamo in modalita' "packaged" (immagini servite via /api/images
+    // perche' fuori da public/). In Electron leggiamo app.isPackaged; in mobile
+    // (nodejs-mobile via Capacitor-NodeJS) il modulo 'electron' non esiste, in tal
+    // caso ci comportiamo SEMPRE come packaged: le immagini stanno in app data dir,
+    // non in public/.
+    let isPackaged = true;
+    try {
+      const { app } = require('electron');
+      isPackaged = !!(app && app.isPackaged);
+    } catch (_) {
+      // require('electron') fallisce sotto nodejs-mobile o headless puro:
+      // assumiamo packaged (= servire via /api/images/*).
+      isPackaged = true;
+    }
+
     for (const ext of extensions) {
       const imagePath = path.join(basePath, charId + ext);
       if (fs.existsSync(imagePath)) {
-        // In produzione: se le immagini sono accanto all'EXE, servile come static files
-        // In sviluppo: usa percorso diretto
-        const { app } = require('electron');
-        if (app && app.isPackaged) {
-          // Le immagini sono nella cartella dell'EXE, servile come static
-          // Ma dobbiamo servirle via API perché non sono in public/
+        if (isPackaged) {
           return `/api/images/${type}/${charId}${ext}`;
         }
         return `/images/${type}/${charId}${ext}`;

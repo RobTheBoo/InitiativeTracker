@@ -20,6 +20,13 @@ const { registerFolderRoutes } = require('../folder-sync/folder-routes');
 function createServer(opts = {}) {
   const paths = buildPaths(opts);
 
+  // Versione dell'app: opts.appVersion ha precedenza (in mobile non possiamo
+  // garantire che `require('../../package.json')` risolva al root corretto
+  // perche' la struttura assets dell'APK e' diversa).
+  const appVersion = opts.appVersion || (() => {
+    try { return require('../../package.json').version; } catch (_) { return 'unknown'; }
+  })();
+
   // Config store (con migrazione legacy data/config.json -> app-data/config.json)
   const configStore = new ConfigStore(paths.configPath, {
     legacyPath: path.join(paths.libraryDir, 'config.json')
@@ -28,8 +35,9 @@ function createServer(opts = {}) {
   // Libreria Pathfinder
   let library = loadLibrary(paths.libraryDir);
 
-  // Database
-  const db = new RPGDatabase(paths.dbPath, paths.getImagesPath);
+  // Database. opts.dbOptions consente al chiamante di passare options al
+  // costruttore di better-sqlite3, p.es. { nativeBinding: '...' } in mobile.
+  const db = new RPGDatabase(paths.dbPath, paths.getImagesPath, opts.dbOptions);
 
   const app = express();
   const httpServer = http.createServer(app);
@@ -73,7 +81,7 @@ function createServer(opts = {}) {
   app.get('/api/health', (req, res) => {
     res.json({
       ok: true,
-      version: require('../../package.json').version,
+      version: appVersion,
       mode: paths.isPackaged ? 'packaged' : 'dev',
       time: Date.now()
     });
@@ -93,7 +101,7 @@ function createServer(opts = {}) {
       // URL pronto da mostrare in QR (preferisce mDNS hostname per stabilita')
       playerUrl: `http://${primaryIp}:${port}/`,
       tabletUrl: `http://${primaryIp}:${port}/tablet.html`,
-      version: require('../../package.json').version
+      version: appVersion
     });
   });
 
@@ -258,7 +266,7 @@ function createServer(opts = {}) {
         if (opts.enableMdns !== false) {
           try {
             await startMdns(addr.port, {
-              version: require('../../package.json').version,
+              version: appVersion,
               hostname: 'rpg-tracker'
             });
           } catch (e) {

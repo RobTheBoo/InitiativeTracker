@@ -55,3 +55,11 @@ data/images/allies/
 android/keystore.properties
 android/app/build/
 
+# Node mobile staging (popolata da BUILDA-APK.ps1, copia di src/+electron/+data/)
+public/nodejs/src/
+public/nodejs/electron/
+public/nodejs/data/
+public/nodejs/webapp/
+public/nodejs/app-package.json
+public/nodejs/node_modules/
+

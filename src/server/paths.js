@@ -23,11 +23,18 @@ function ensureDir(p) {
  * con sync in background. Se rileviamo un path che contiene "OneDrive" emettiamo un warn.
  */
 function resolveDataDir(opts = {}) {
+  // 1. Override esplicito via parametro (utile per Capacitor-NodeJS che passa il
+  //    path scrivibile ottenuto dal bridge `getDataPath()`).
+  if (opts.dataDir) {
+    return ensureDir(opts.dataDir);
+  }
+
+  // 2. Override via env (test/CI).
   if (process.env.RPG_DATA_DIR) {
     return ensureDir(process.env.RPG_DATA_DIR);
   }
 
-  // Se siamo in Electron e l'app e' packaged
+  // 3. Modalita' Electron packaged.
   if (opts.electronApp && opts.electronApp.isPackaged) {
     const exeDir = path.dirname(opts.electronApp.getPath('exe'));
     // Build "portable" di sviluppo (eseguita da dist/win-unpacked): dati accanto
@@ -41,7 +48,7 @@ function resolveDataDir(opts = {}) {
     return ensureDir(opts.electronApp.getPath('userData'));
   }
 
-  // Dev / headless: usa <project>/app-data
+  // 4. Dev / headless: usa <project>/app-data.
   const projectRoot = opts.projectRoot || path.resolve(__dirname, '..', '..');
   return ensureDir(path.join(projectRoot, 'app-data'));
 }
@@ -63,15 +70,22 @@ function buildPaths(opts = {}) {
 
   const projectRoot = opts.projectRoot || path.resolve(__dirname, '..', '..');
 
-  // In sviluppo (non packaged) le immagini possono restare in public/images per
-  // sviluppo veloce; in packaged stanno in app-data/images.
-  const isPackaged = !!(opts.electronApp && opts.electronApp.isPackaged);
+  // In Electron packaged o in modalita' "mobile" (Capacitor-NodeJS) il bundle
+  // assets/ e' read-only, quindi le immagini DEVONO stare in dataDir/images.
+  // In dev (npm start / Electron unpackaged) le immagini stanno in
+  // public/images/ per editing veloce.
+  const isPackaged = !!(opts.electronApp && opts.electronApp.isPackaged) || opts.mobile === true;
   const imagesBase = isPackaged
     ? path.join(dataDir, 'images')
     : path.join(projectRoot, 'public', 'images');
 
   ensureDir(imagesBase);
   ['heroes', 'enemies', 'allies', 'summons'].forEach(sub => ensureDir(path.join(imagesBase, sub)));
+
+  // publicDir / libraryDir possono essere passati via opts in modalita' mobile
+  // dove l'APK ha una struttura assets/ diversa dal projectRoot dev.
+  const publicDir = opts.publicDir || path.join(projectRoot, 'public');
+  const libraryDir = opts.libraryDir || path.join(projectRoot, 'data');
 
   return {
     dataDir,
@@ -80,8 +94,8 @@ function buildPaths(opts = {}) {
     dbPath: path.join(dataDir, 'rpg-tracker.db'),
     configPath: path.join(dataDir, 'config.json'),
     folderSyncConfigPath: path.join(dataDir, 'folder-sync.json'),
-    publicDir: path.join(projectRoot, 'public'),
-    libraryDir: path.join(projectRoot, 'data'),
+    publicDir,
+    libraryDir,
     imagesBase,
     getImagesPath: (subfolder) => ensureDir(path.join(imagesBase, subfolder)),
     /**

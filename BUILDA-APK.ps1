@@ -21,6 +21,16 @@ $distDir      = Join-Path $root "dist"
 $apkBuildPath = Join-Path $root "dist\android-build\app\outputs\apk\debug\app-debug.apk"
 $apkDestPath  = Join-Path $distDir "RPG-Initiative-Tracker-debug.apk"
 
+# Cartelle staging per il server Node embedded (copiate dentro public/nodejs/
+# prima del cap sync, in modo che il bundle assets dell'APK abbia tutto il
+# server condiviso senza duplicare codice nel repo).
+$nodejsDir    = Join-Path $root "public\nodejs"
+$nodejsSrc    = Join-Path $nodejsDir "src"
+$nodejsElec   = Join-Path $nodejsDir "electron"
+$nodejsData   = Join-Path $nodejsDir "data"
+$nodejsWebapp = Join-Path $nodejsDir "webapp"
+$nodejsPkg    = Join-Path $nodejsDir "app-package.json"
+
 Write-Host ""
 Write-Host "=== RPG Initiative Tracker - Build APK ===" -ForegroundColor Cyan
 Write-Host "Root progetto: $root" -ForegroundColor Gray
@@ -138,6 +148,60 @@ if (Test-Path $pluginsDir) {
     Write-Host "  OK: capacitor-cordova-android-plugins rimossa" -ForegroundColor Green
 } else {
     Write-Host "  OK: capacitor-cordova-android-plugins non esiste, nulla da fare" -ForegroundColor Green
+}
+
+# ------------------------------------------------------------
+# STEP 2bis: prepara public/nodejs/ con i sorgenti del server condiviso.
+# Il server Node embedded nell'APK usa lo STESSO codice di Electron/headless,
+# senza duplicare i file nel repo. Qui li copiamo "freschi" in public/nodejs/
+# prima del cap sync, cosi' finiscono nel bundle assets dell'APK.
+# ------------------------------------------------------------
+Write-Host ""
+Write-Host "=== STEP 2bis: Stage Node sources in public/nodejs/ ===" -ForegroundColor Cyan
+
+# Pulizia delle cartelle "stage" (non tocchiamo node_modules, sqlite-prebuilds,
+# index.js, package.json: quelli sono permanent del progetto mobile).
+foreach ($d in @($nodejsSrc, $nodejsElec, $nodejsData, $nodejsWebapp)) {
+    if (Test-Path $d) { Remove-Item -Recurse -Force $d -ErrorAction SilentlyContinue }
+}
+
+# Copia sorgenti server condiviso
+Copy-Item -Recurse -Force (Join-Path $root "src") $nodejsSrc
+New-Item -ItemType Directory -Force -Path $nodejsElec | Out-Null
+foreach ($f in @("database.js", "room-manager.js", "game-logic.js")) {
+    Copy-Item (Join-Path $root "electron\$f") (Join-Path $nodejsElec $f) -Force
+}
+Copy-Item -Recurse -Force (Join-Path $root "data") $nodejsData
+
+# Copia package.json del progetto root in app-package.json (per leggerne la
+# version dentro il server senza scontrarsi con il package.json del mobile).
+Copy-Item (Join-Path $root "package.json") $nodejsPkg -Force
+
+# Copia tutta la webapp (HTML/CSS/JS/immagini in public/) dentro nodejs/webapp/,
+# ESCLUDENDO public/nodejs/ stessa per non creare ricorsione. Il server Express
+# embedded servira' questi file ai Player esterni che si collegano via LAN
+# all'IP del telefono Master.
+New-Item -ItemType Directory -Force -Path $nodejsWebapp | Out-Null
+Get-ChildItem -Path (Join-Path $root "public") -Force | Where-Object { $_.Name -ne "nodejs" } | ForEach-Object {
+    Copy-Item -Recurse -Force $_.FullName (Join-Path $nodejsWebapp $_.Name)
+}
+
+Write-Host "  OK: stage src/, electron/{database,room-manager,game-logic}.js, data/, webapp/, app-package.json" -ForegroundColor Green
+
+# Se mancano i node_modules dentro public/nodejs/, eseguo npm install qui.
+# (Non committiamo node_modules in git: il primo `cap sync` su una macchina
+# pulita richiederebbe questa installazione manuale.)
+if (-not (Test-Path (Join-Path $nodejsDir "node_modules"))) {
+    Write-Host "  Manca public/nodejs/node_modules: eseguo npm install..." -ForegroundColor Yellow
+    Push-Location $nodejsDir
+    & npm install --no-audit --no-fund
+    if ($LASTEXITCODE -ne 0) {
+        Pop-Location
+        Write-Host "  ERRORE: npm install in public/nodejs/ fallito (exit $LASTEXITCODE)" -ForegroundColor Red
+        exit 1
+    }
+    Pop-Location
+    Write-Host "  OK: dipendenze mobile installate" -ForegroundColor Green
 }
 
 # ------------------------------------------------------------
