@@ -471,6 +471,154 @@
   // ===== UI 3-sorgenti (2026-05) ==============================
   // ============================================================
 
+  // Detect Capacitor (APK Android) — il file picker nativo va per content:// URI,
+  // non per path POSIX. La UI cambia: niente input testuale path, ma "Aggiungi file"
+  // multi-select con upload multipart al server.
+  const isCapacitor = (function () {
+    try {
+      return !!(window.Capacitor && typeof window.Capacitor.getPlatform === 'function'
+        && window.Capacitor.getPlatform() !== 'web');
+    } catch (_) { return false; }
+  })();
+
+  function getFilePickerPlugin() {
+    try {
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.FilePicker) {
+        return window.Capacitor.Plugins.FilePicker;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // Trasforma il path nativo (content://...) in una URL leggibile dalla WebView
+  // e poi in Blob via fetch. Approach raccomandato dal team Capawesome quando
+  // i file sono > 1-2 MB (readData:true puo' crashare l'app).
+  async function fileToBlob(file) {
+    if (file.blob) return file.blob; // Web: gia' Blob diretto.
+    if (!file.path) throw new Error('File senza path nativo');
+    const url = window.Capacitor.convertFileSrc(file.path);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Lettura file fallita: HTTP ' + res.status);
+    return await res.blob();
+  }
+
+  // Helper: aggiunge una riga di "stato file caricati" sotto il bottone giusto.
+  function setMobileLog(elId, msg, isError) {
+    const el = $(elId);
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color = isError ? '#ff6b6b' : 'var(--text-light)';
+  }
+
+  async function pickAndUploadImages() {
+    const FilePicker = getFilePickerPlugin();
+    if (!FilePicker) { alert('File picker non disponibile in questa versione APK.'); return; }
+    const sub = $('src-images-mobile-sub').value;
+    setMobileLog('src-images-status', '⏳ Apertura file picker...', false);
+    let result;
+    try {
+      result = await FilePicker.pickFiles({ types: ['image/*'], limit: 0, readData: false });
+    } catch (e) {
+      setMobileLog('src-images-status', '❌ Selezione annullata o errore: ' + e.message, true);
+      return;
+    }
+    const files = (result && result.files) || [];
+    if (!files.length) { setMobileLog('src-images-status', 'Nessun file selezionato.', false); return; }
+
+    setMobileLog('src-images-status', `⏳ Carico ${files.length} immagini in "${sub}"...`, false);
+    const fd = new FormData();
+    fd.append('subfolder', sub);
+    let read = 0;
+    for (const f of files) {
+      try {
+        const blob = await fileToBlob(f);
+        fd.append('files', blob, f.name || `img-${Date.now()}.bin`);
+        read++;
+      } catch (e) {
+        console.warn('Skip', f.name, e.message);
+      }
+    }
+    if (read === 0) { setMobileLog('src-images-status', '❌ Nessun file leggibile', true); return; }
+
+    try {
+      const r = await fetch('/api/folder/upload-images', { method: 'POST', body: fd });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const out = await r.json();
+      setMobileLog('src-images-status', `✅ ${out.copied} immagini copiate in "${sub}" (errori: ${out.errors.length})`, false);
+    } catch (e) {
+      setMobileLog('src-images-status', '❌ Upload fallito: ' + e.message, true);
+    }
+  }
+
+  async function pickAndUploadRooms() {
+    const FilePicker = getFilePickerPlugin();
+    if (!FilePicker) { alert('File picker non disponibile in questa versione APK.'); return; }
+    setMobileLog('src-rooms-status', '⏳ Apertura file picker...', false);
+    let result;
+    try {
+      result = await FilePicker.pickFiles({ types: ['application/json'], limit: 0, readData: false });
+    } catch (e) {
+      setMobileLog('src-rooms-status', '❌ ' + e.message, true);
+      return;
+    }
+    const files = (result && result.files) || [];
+    if (!files.length) { setMobileLog('src-rooms-status', 'Nessun file selezionato.', false); return; }
+
+    setMobileLog('src-rooms-status', `⏳ Carico ${files.length} stanze...`, false);
+    const fd = new FormData();
+    let read = 0;
+    for (const f of files) {
+      try {
+        const blob = await fileToBlob(f);
+        fd.append('files', blob, f.name || `room-${Date.now()}.json`);
+        read++;
+      } catch (e) {
+        console.warn('Skip', f.name, e.message);
+      }
+    }
+    if (read === 0) { setMobileLog('src-rooms-status', '❌ Nessun file leggibile', true); return; }
+
+    try {
+      const r = await fetch('/api/folder/upload-rooms', { method: 'POST', body: fd });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const out = await r.json();
+      setMobileLog('src-rooms-status', `✅ ${out.created} create · ${out.overwritten} sovrascritte · ${out.skipped} saltate (errori: ${out.errors.length})`, false);
+    } catch (e) {
+      setMobileLog('src-rooms-status', '❌ Upload fallito: ' + e.message, true);
+    }
+  }
+
+  async function pickAndUploadLibrary() {
+    const FilePicker = getFilePickerPlugin();
+    if (!FilePicker) { alert('File picker non disponibile in questa versione APK.'); return; }
+    setMobileLog('src-library-status', '⏳ Apertura file picker...', false);
+    let result;
+    try {
+      result = await FilePicker.pickFiles({ types: ['application/json'], limit: 1, readData: false });
+    } catch (e) {
+      setMobileLog('src-library-status', '❌ ' + e.message, true);
+      return;
+    }
+    const files = (result && result.files) || [];
+    if (!files.length) { setMobileLog('src-library-status', 'Nessun file selezionato.', false); return; }
+
+    const f = files[0];
+    setMobileLog('src-library-status', '⏳ Carico libreria...', false);
+    try {
+      const blob = await fileToBlob(f);
+      const fd = new FormData();
+      fd.append('file', blob, f.name || 'config.json');
+      const r = await fetch('/api/folder/upload-library', { method: 'POST', body: fd });
+      const out = await r.json();
+      if (!r.ok) throw new Error(out.error || 'HTTP ' + r.status);
+      const c = out.counts || {};
+      setMobileLog('src-library-status', `✅ Libreria importata: ${c.heroes||0} eroi, ${c.enemies||0} nemici, ${c.allies||0} alleati, ${c.summons||0} evoc., ${c.effects||0} effetti`, false);
+    } catch (e) {
+      setMobileLog('src-library-status', '❌ Upload fallito: ' + e.message, true);
+    }
+  }
+
+
   // Mostra il "probe" come riga di stato sotto ogni input.
   function setSrcStatus(elId, probe, kind) {
     const el = $(elId);
@@ -716,14 +864,38 @@
 
     // Bindings nuova UI 3-sorgenti
     if ($('src-images-pick')) {
-      $('src-images-pick').addEventListener('click', () => pickSourceFolder('src-images-path', 'src-images-status'));
-      $('src-rooms-pick').addEventListener('click', () => pickSourceFolder('src-rooms-path', 'src-rooms-status'));
-      $('src-library-pick').addEventListener('click', () => pickSourceFile('src-library-path', 'src-library-status'));
-      $('src-images-clear').addEventListener('click', () => clearSource('imagesPath'));
-      $('src-rooms-clear').addEventListener('click', () => clearSource('roomsPath'));
-      $('src-library-clear').addEventListener('click', () => clearSource('libraryPath'));
-      $('src-save-btn').addEventListener('click', saveSources);
-      $('src-import-btn').addEventListener('click', importFromSources);
+      if (isCapacitor) {
+        // Su APK: nascondi input testuale + Sfoglia (path POSIX non hanno senso),
+        // mostra invece i bottoni "Aggiungi file" che usano FilePicker nativo.
+        $('src-images-path').style.display = 'none';
+        $('src-images-pick').style.display = 'none';
+        $('src-images-clear').style.display = 'none';
+        $('src-rooms-path').style.display = 'none';
+        $('src-rooms-pick').style.display = 'none';
+        $('src-rooms-clear').style.display = 'none';
+        $('src-library-path').style.display = 'none';
+        $('src-library-pick').style.display = 'none';
+        $('src-library-clear').style.display = 'none';
+        $('src-images-mobile').style.display = 'flex';
+        $('src-rooms-mobile').style.display = 'flex';
+        $('src-library-mobile').style.display = 'flex';
+        $('src-actions-desktop').style.display = 'none';
+        $('src-desc-desktop').style.display = 'none';
+        $('src-desc-mobile').style.display = '';
+
+        $('src-images-mobile-add').addEventListener('click', pickAndUploadImages);
+        $('src-rooms-mobile-add').addEventListener('click', pickAndUploadRooms);
+        $('src-library-mobile-add').addEventListener('click', pickAndUploadLibrary);
+      } else {
+        $('src-images-pick').addEventListener('click', () => pickSourceFolder('src-images-path', 'src-images-status'));
+        $('src-rooms-pick').addEventListener('click', () => pickSourceFolder('src-rooms-path', 'src-rooms-status'));
+        $('src-library-pick').addEventListener('click', () => pickSourceFile('src-library-path', 'src-library-status'));
+        $('src-images-clear').addEventListener('click', () => clearSource('imagesPath'));
+        $('src-rooms-clear').addEventListener('click', () => clearSource('roomsPath'));
+        $('src-library-clear').addEventListener('click', () => clearSource('libraryPath'));
+        $('src-save-btn').addEventListener('click', saveSources);
+        $('src-import-btn').addEventListener('click', importFromSources);
+      }
     }
 
     // Refresh quando si apre la tab

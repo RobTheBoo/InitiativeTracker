@@ -14,12 +14,21 @@
 //   POST   /api/folder/analyze-sources   { imagesPath?, roomsPath?, libraryPath? } -> preview
 //   POST   /api/folder/import-sources    { imagesPath?, roomsPath?, libraryPath?, resolutions? }
 //
+// API APK Capacitor (upload diretto, l'utente non puo' fornire path locali):
+//   POST   /api/folder/upload-images   multipart "files[]" + body { subfolder } -> copia in app-data/images/<sub>/
+//   POST   /api/folder/upload-rooms    multipart "files[]"                       -> import nel DB (resolutions opzionali)
+//   POST   /api/folder/upload-library  multipart "file" (singolo)                -> merge libreria
+//
 // Espone anche scheduleAutoExport() che il config-store / room-manager possono chiamare.
 
 const path = require('path');
 const fs = require('fs');
+const multer = require('multer');
 const { FolderStore } = require('./folder-store');
 const folderSync = require('./folder-sync');
+
+const VALID_SUBS = ['heroes', 'enemies', 'allies', 'summons'];
+const IMG_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg']);
 
 function registerFolderRoutes(app, paths, configStore, db) {
   const store = new FolderStore(path.join(paths.dataDir, 'folder-sync.json'));
@@ -245,6 +254,132 @@ function registerFolderRoutes(app, paths, configStore, db) {
       res.json(analysis);
     } catch (e) {
       res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ===== APK upload endpoints =====
+  // Su APK Capacitor l'utente non puo' fornire path POSIX delle proprie cartelle:
+  // li' usiamo il file-picker nativo, leggiamo i file nella WebView, e li
+  // facciamo upload qui via multipart. Il server li scrive nelle stesse posizioni
+  // che usa applyImportSources(), garantendo lo stesso comportamento end-to-end.
+
+  // Multer in-memory: i file passano per RAM, scriviamo noi su disco
+  // (vogliamo controllare la directory di destinazione sub-by-sub).
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 25 * 1024 * 1024, // 25 MB per file (avatar, json) — abbondante
+      files: 200                  // max 200 file per upload
+    }
+  });
+
+  app.post('/api/folder/upload-images', upload.array('files', 200), async (req, res) => {
+    const files = req.files || [];
+    if (!files.length) return res.status(400).json({ error: 'Nessun file caricato' });
+    const subfolder = (req.body && req.body.subfolder) || '';
+    const sub = VALID_SUBS.includes(subfolder) ? subfolder : 'heroes';
+    const dstDir = paths.getImagesPath(sub);
+
+    const result = { copied: 0, errors: [], target: dstDir };
+    for (const f of files) {
+      try {
+        const ext = path.extname(f.originalname).toLowerCase();
+        if (!IMG_EXTS.has(ext)) {
+          result.errors.push({ file: f.originalname, error: 'estensione non supportata' });
+          continue;
+        }
+        // Stesso nome -> sovrascrive (politica voluta dall'utente).
+        const dst = path.join(dstDir, f.originalname);
+        const tmp = dst + '.tmp';
+        fs.writeFileSync(tmp, f.buffer);
+        fs.renameSync(tmp, dst);
+        result.copied++;
+      } catch (e) {
+        result.errors.push({ file: f.originalname, error: e.message });
+      }
+    }
+    store.update(c => { c.lastImportAt = Date.now(); return c; });
+    res.json(result);
+  });
+
+  app.post('/api/folder/upload-rooms', upload.array('files', 200), async (req, res) => {
+    const files = req.files || [];
+    if (!files.length) return res.status(400).json({ error: 'Nessun file caricato' });
+    let resolutions = {};
+    try { resolutions = req.body && req.body.resolutions ? JSON.parse(req.body.resolutions) : {}; }
+    catch (_) { resolutions = {}; }
+
+    const result = { created: 0, overwritten: 0, skipped: 0, errors: [] };
+    const existingIds = new Set(db.getAllRooms().map(r => r.id));
+    for (const f of files) {
+      try {
+        if (!f.originalname.toLowerCase().endsWith('.json')) {
+          result.errors.push({ file: f.originalname, error: 'non e\' un .json' });
+          continue;
+        }
+        const payload = JSON.parse(f.buffer.toString('utf8'));
+        const room = payload.room || {};
+        if (!room.id) {
+          result.errors.push({ file: f.originalname, error: 'manca room.id' });
+          continue;
+        }
+        const exists = existingIds.has(room.id);
+        const decision = resolutions[room.id] || (exists ? 'skip' : 'create');
+        if (exists && decision === 'skip') { result.skipped++; continue; }
+        if (exists && decision === 'overwrite') {
+          if (payload.gameState) db.saveRoomState(room.id, payload.gameState);
+          const updates = {};
+          if (room.name) updates.name = room.name;
+          if (room.status) updates.status = room.status;
+          if (typeof room.current_round === 'number') updates.current_round = room.current_round;
+          if (typeof room.combat_started === 'number') updates.combat_started = room.combat_started;
+          if (Object.keys(updates).length) db.updateRoom(room.id, updates);
+          result.overwritten++;
+        } else {
+          if (!exists) db.createRoom(room.id, room.name || 'Stanza importata');
+          if (payload.gameState) db.saveRoomState(room.id, payload.gameState);
+          result.created++;
+        }
+      } catch (e) {
+        result.errors.push({ file: f.originalname, error: e.message });
+      }
+    }
+    store.update(c => { c.lastImportAt = Date.now(); return c; });
+    res.json(result);
+  });
+
+  app.post('/api/folder/upload-library', upload.single('file'), async (req, res) => {
+    const f = req.file;
+    if (!f) return res.status(400).json({ error: 'Nessun file caricato' });
+    if (!f.originalname.toLowerCase().endsWith('.json')) {
+      return res.status(400).json({ error: 'Atteso un file .json (config / libreria personaggi)' });
+    }
+    try {
+      const incoming = JSON.parse(f.buffer.toString('utf8'));
+      configStore.update(c => {
+        for (const key of ['heroes', 'enemies', 'allies', 'summons', 'effects']) {
+          const local = Array.isArray(c[key]) ? c[key] : [];
+          const remote = Array.isArray(incoming[key]) ? incoming[key] : [];
+          const map = new Map(local.map(x => [x.id, x]));
+          for (const item of remote) {
+            if (item && item.id) map.set(item.id, { ...map.get(item.id), ...item });
+          }
+          c[key] = Array.from(map.values());
+        }
+        return c;
+      });
+      if (typeof configStore.flush === 'function') configStore.flush();
+      store.update(c => { c.lastImportAt = Date.now(); return c; });
+      const counts = {
+        heroes: Array.isArray(incoming.heroes) ? incoming.heroes.length : 0,
+        enemies: Array.isArray(incoming.enemies) ? incoming.enemies.length : 0,
+        allies: Array.isArray(incoming.allies) ? incoming.allies.length : 0,
+        summons: Array.isArray(incoming.summons) ? incoming.summons.length : 0,
+        effects: Array.isArray(incoming.effects) ? incoming.effects.length : 0
+      };
+      res.json({ imported: true, counts });
+    } catch (e) {
+      res.status(400).json({ error: 'JSON non valido: ' + e.message });
     }
   });
 

@@ -305,6 +305,17 @@ config.json   (struttura: heroes, enemies, allies, summons, effects)</code></pre
             <button class="btn secondary tiny" id="src-images-pick" style="flex: 0 0 auto;">📁 Sfoglia</button>
             <button class="btn secondary tiny" id="src-images-clear" style="flex: 0 0 auto;" title="Rimuovi puntamento">✖️</button>
           </div>
+          <!-- Su APK: dropdown categoria + bottone "Aggiungi file" multi-select. -->
+          <div id="src-images-mobile" style="display: none; gap: 8px; align-items: center; flex-wrap: wrap; margin: -4px 0 12px 138px;">
+            <span style="color: var(--text-dim); font-size: 0.82rem;">Categoria:</span>
+            <select id="src-images-mobile-sub" style="background: var(--bg-light); color: var(--text-light); border: 1px solid var(--border-gold); border-radius: 4px; padding: 4px 8px;">
+              <option value="heroes">heroes (eroi)</option>
+              <option value="enemies">enemies (nemici)</option>
+              <option value="allies">allies (alleati)</option>
+              <option value="summons">summons (evocazioni)</option>
+            </select>
+            <button class="btn primary tiny" id="src-images-mobile-add">📁 Aggiungi immagini</button>
+          </div>
           <div id="src-images-status" class="src-status" style="margin: -4px 0 12px 138px; font-size: 0.82rem; color: var(--text-dim);"></div>
 
           <!-- Riga STANZE -->
@@ -313,6 +324,9 @@ config.json   (struttura: heroes, enemies, allies, summons, effects)</code></pre
             <input type="text" id="src-rooms-path" placeholder="(opzionale) cartella con file <id>.json di stanze esportate" style="flex: 1 1 280px; min-width: 0; padding: 8px 10px; background: var(--bg-light); border: 1px solid var(--border-gold); border-radius: 4px; color: var(--text-light); font-size: 0.9rem;" />
             <button class="btn secondary tiny" id="src-rooms-pick" style="flex: 0 0 auto;">📁 Sfoglia</button>
             <button class="btn secondary tiny" id="src-rooms-clear" style="flex: 0 0 auto;" title="Rimuovi puntamento">✖️</button>
+          </div>
+          <div id="src-rooms-mobile" style="display: none; gap: 8px; align-items: center; margin: -4px 0 12px 138px;">
+            <button class="btn primary tiny" id="src-rooms-mobile-add">🏰 Aggiungi stanze (.json)</button>
           </div>
           <div id="src-rooms-status" class="src-status" style="margin: -4px 0 12px 138px; font-size: 0.82rem; color: var(--text-dim);"></div>
 
@@ -323,15 +337,20 @@ config.json   (struttura: heroes, enemies, allies, summons, effects)</code></pre
             <button class="btn secondary tiny" id="src-library-pick" style="flex: 0 0 auto;">📄 Sfoglia</button>
             <button class="btn secondary tiny" id="src-library-clear" style="flex: 0 0 auto;" title="Rimuovi puntamento">✖️</button>
           </div>
+          <div id="src-library-mobile" style="display: none; gap: 8px; align-items: center; margin: -4px 0 12px 138px;">
+            <button class="btn primary tiny" id="src-library-mobile-add">⚙️ Aggiungi libreria (config.json)</button>
+          </div>
           <div id="src-library-status" class="src-status" style="margin: -4px 0 12px 138px; font-size: 0.82rem; color: var(--text-dim);"></div>
 
-          <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px;">
+          <div id="src-actions-desktop" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px;">
             <button class="btn primary large" id="src-import-btn">📥 Importa da queste sorgenti</button>
             <button class="btn secondary" id="src-save-btn">💾 Salva puntamenti</button>
           </div>
           <p style="color: var(--text-dim); font-size: 0.82rem; margin-top: 10px; line-height: 1.5;">
-            I puntamenti vengono ricordati. L'app salva tutti i dati importati nella propria cartella di lavoro
-            (<code id="src-data-dir-hint">app-data</code>): i file della sorgente <strong>non vengono mai modificati</strong>.
+            <span id="src-desc-desktop">I puntamenti vengono ricordati. L'app salva tutti i dati importati nella propria cartella di lavoro
+            (<code id="src-data-dir-hint">app-data</code>): i file della sorgente <strong>non vengono mai modificati</strong>.</span>
+            <span id="src-desc-mobile" style="display: none;">Su Android l'app usa il file picker di sistema. I file selezionati vengono <strong>copiati</strong>
+            nella memoria interna dell'app (<code id="src-data-dir-hint-mobile">app-data</code>) e da li' usati per giocare. La sorgente <strong>non viene mai modificata</strong>.</span>
           </p>
         </div>
 

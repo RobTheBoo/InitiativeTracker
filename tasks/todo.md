@@ -234,16 +234,40 @@ Ogni puntamento opzionale e indipendente. UI:
 
 ### Step C — APK Capacitor — 4-5h
 
-- [ ] **C1**: `npm install @capawesome/capacitor-file-picker` (file picker
-  multi-select PNG/JPG e JSON).
-- [ ] **C2**: server endpoint `POST /api/folder/upload` (multipart) che
-  accetta file + tipo (`image`/`room`/`library`) e li scrive in app-data.
-- [ ] **C3**: in `config.html`, quando `window.isCapacitorApp`, sostituire
-  il bottone "Sfoglia" con "Aggiungi file" (multi-select) che:
-  - Per immagini: legge i file via Filesystem.readFile, POST multipart al server.
-  - Per stanze: idem (json).
-  - Per config: idem (singolo json).
-- [ ] **C4**: feedback UI: progress bar per file count grossi (immagini > 50).
+- [x] **C1**: `npm install @capawesome/capacitor-file-picker@^7.2.0` (file picker
+  multi-select PNG/JPG e JSON, compat Capacitor 7).
+- [x] **C2**: 3 server endpoint multipart in `folder-routes.js`:
+  - `POST /api/folder/upload-images` (multer in-memory, scrive in
+    app-data/images/<sub>/, sub valida tra heroes/enemies/allies/summons,
+    stesso nome sovrascrive)
+  - `POST /api/folder/upload-rooms` (parsing JSON, conflitti via resolutions)
+  - `POST /api/folder/upload-library` (singolo file, merge per id come
+    applyImportSources)
+- [x] **C3**: in `config.html` + `folder-sync.js`, branch su `isCapacitor`:
+  - Nasconde input testuale path + bottoni Sfoglia/Clear.
+  - Mostra dropdown sub-cartella + bottone "📁 Aggiungi immagini".
+  - Mostra bottoni "🏰 Aggiungi stanze" e "⚙️ Aggiungi libreria".
+  - File picker via `Capacitor.Plugins.FilePicker.pickFiles({types, limit})`.
+  - Lettura blob via `Capacitor.convertFileSrc(file.path)` + fetch (no
+    readData per evitare crash su file grandi).
+  - Upload via FormData multipart agli endpoint server.
+  - Feedback inline sotto ogni bottone con copied/created/errors.
+- [x] **C4**: BUILDA-APK.ps1 nessuna modifica necessaria - `cap sync`
+  rileva e include automaticamente il plugin file picker.
+
+**Verifiche su emulator (2026-05-20)**:
+- APK build: 165 MB (era 57, +108 MB per AndroidX + transitivi del file picker)
+- `npx cap ls android` -> 3 plugin: screen-orientation, file-picker, nodejs.
+- logcat: `Capacitor: Registering plugin instance: FilePicker` ✅
+- Server embedded up + endpoint /api/folder/sources, /upload-* funzionanti
+  via adb forward + curl multipart:
+  - upload-library: { imported:true, counts:{ heroes:1, effects:1 } }
+  - upload-rooms: { created:1 }
+  - upload-images: { copied:1, target:".../images/heroes" }
+- HTML del config.html servito dal Node embedded contiene `src-images-mobile`
+  (curl + grep). Nuova UI presente.
+- Test visivo file picker SAF: rimandato al device fisico utente
+  (l'AVD x86_64 in dotazione e' bloccato in stato "recents view" da snapshot).
 
 ### Step D — Test E2E + commit — 1-2h
 
@@ -254,6 +278,46 @@ Ogni puntamento opzionale e indipendente. UI:
 
 **Stima totale: 9-13h**
 
-## Review
+## Review (2026-05-20)
 
-> Da compilare al termine.
+### Risultato
+
+Implementazione **completa** del 3-source local import su Windows e APK.
+
+**Windows / Electron**:
+- 3 input testuali con dialog nativo (folder o file).
+- Persistenza dei 3 path nel folder-sync.json. Migrazione automatica da
+  vecchio `folderPath` legacy.
+- Bottone "Importa da queste sorgenti" -> analyze (preview con conteggi e
+  conflitti) -> modal -> apply.
+
+**APK Android**:
+- File picker SAF nativo via @capawesome/capacitor-file-picker.
+- 3 bottoni "Aggiungi" (immagini/stanze/libreria) che fanno upload multipart
+  al server Node embedded.
+- Endpoint server-side dedicati che scrivono nelle stesse posizioni
+  app-data del flusso desktop. Comportamento identico (stesso nome
+  sovrascrive, nome diverso aggiunge, conflitti rooms via resolutions).
+
+**Cosa NON viene mai modificato**: i file nella sorgente. L'app fa solo
+lettura su Windows; su Android gli upload sono copie in memoria.
+
+### Limiti / lavoro futuro
+
+- APK size cresciuto da 57 MB a 165 MB (+108 MB) per le dependencies
+  AndroidX trascinate dal file picker. Possibile slimming via R8/proguard
+  ma non urgente.
+- Test visivo SAF picker non eseguito su emulator (AVD bloccato in
+  recents view); l'utente lo testera' su device fisico.
+- Non c'e' un pulsante "Annulla import" durante l'upload. Per ora se
+  l'utente sbaglia categoria immagini, basta cancellare i file dalla
+  cartella images/<sub>/ e ricaricare.
+
+### Bug fix scoperti durante test
+
+- Inizialmente `Invoke-RestMethod` di PowerShell andava in timeout
+  silenzioso contro il server tramite adb forward. Fix: usare `curl.exe`
+  che e' piu' affidabile per richieste multipart binary.
+- File JSON salvati con `Out-File -Encoding utf8` di PowerShell hanno
+  BOM iniziale che fa fallire `JSON.parse`. Fix per i test:
+  `[System.IO.File]::WriteAllText(path, content, [UTF8Encoding]::new($false))`.

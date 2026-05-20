@@ -632,3 +632,85 @@ E in `android/variables.gradle`: `compileSdkVersion = 35`,
    problemi di binding/codice da problemi di rete WiFi.
 4. SEMPRE avere un fallback se `process.arch` non corrisponde a un
    prebuilt: log di errore chiaro, NO crash silenzioso.
+
+---
+
+## 2026-05-20 — Capacitor file picker: leggere file via convertFileSrc + fetch
+
+**Problema.** `@capawesome/capacitor-file-picker` su Android restituisce
+oggetti `{path, name, mimeType, size}` dove `path` e' una `content://` URI
+del Storage Access Framework. Non e' un path POSIX, NON puoi farci
+`fs.readFile()` ne' allegarla a una FormData come stringa: serve
+trasformarla in Blob.
+
+Due strade documentate:
+1. **`pickFiles({readData: true})`** → ritorna `data` come base64. Comodo
+   ma la doc avverte che file > qualche MB possono crashare l'app
+   (vedi [blog Capawesome](https://capawesome.io/blog/the-file-handling-guide-for-capacitor)).
+2. **`Capacitor.convertFileSrc(path)` + `fetch()`** → API stabile, niente
+   limiti di size pratici. Approccio raccomandato.
+
+**Pattern (vincente).**
+
+```js
+async function fileToBlob(file) {
+  if (file.blob) return file.blob;       // Web: blob diretto.
+  if (!file.path) throw new Error('File senza path nativo');
+  const url = window.Capacitor.convertFileSrc(file.path);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return await res.blob();
+}
+
+// Upload multipart al server Node embedded:
+const fd = new FormData();
+for (const f of pickedFiles) {
+  fd.append('files', await fileToBlob(f), f.name);
+}
+await fetch('/api/folder/upload-images', { method: 'POST', body: fd });
+```
+
+**Pattern fondamentali:**
+1. NON usare `readData: true` per immagini grandi: rischio crash. Solo
+   per JSON di config piccoli (< 100 KB) puo' essere accettabile.
+2. SEMPRE preferire `fetch(convertFileSrc(path))` perche' il browser
+   sa gestire content URI e blob senza caricare tutto in JS heap.
+3. Il file picker SAF di Android puo' restituire URI EFFIMERE: leggile
+   subito o salvale, non assumere che siano valide dopo che l'app va in
+   background. Se servono persistenti, copiare immediatamente in app-data.
+
+---
+
+## 2026-05-20 — Test multipart contro Node embedded: usa curl.exe non Invoke-RestMethod
+
+**Problema.** Per testare endpoint multipart `/api/folder/upload-*`
+del server Node embedded nell'APK (via `adb forward tcp:13001 tcp:3001`),
+ho provato:
+
+```powershell
+$form = @{ files = Get-Item file.png }
+Invoke-RestMethod http://127.0.0.1:13001/api/folder/upload-images `
+                  -Method Post -Form $form
+```
+
+Risultato: **timeout silenzioso o connection reset**. PowerShell
+`Invoke-RestMethod` (.NET HttpWebRequest) ha problemi documentati con
+HTTP keep-alive su connessioni `adb forward` su Windows 10/11.
+
+**Fix.** Usare `curl.exe` (incluso in Windows 10+ 1803):
+
+```powershell
+curl.exe -s -X POST `
+  -F "subfolder=heroes" `
+  -F "files=@C:\path\to\image.png" `
+  http://127.0.0.1:13001/api/folder/upload-images
+```
+
+**Pattern di prevenzione.** Per qualunque test E2E con server Node
+sull'emulator Android via `adb forward`:
+1. Per GET semplici: `Invoke-RestMethod` va.
+2. Per POST multipart o WebSocket-like: `curl.exe` o uno script Node
+   con `fetch()` / `socket.io-client`.
+3. Salvare i JSON di test con `[System.IO.File]::WriteAllText` con
+   encoding `[UTF8Encoding]::new($false)` (no BOM), altrimenti
+   `JSON.parse` server-side fallisce con `Unexpected token "?"`.
