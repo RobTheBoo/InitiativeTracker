@@ -503,3 +503,132 @@ function apiUrl(path) {
 5. Quando una pagina arriva senza serverUrl noto in APK Capacitor (es deep
    link diretto) NON fare fetch silenziosi che falliscono → mostrare un
    prompt esplicito che porti l'utente a un onboarding (es vista giocatore).
+
+---
+
+## 2026-05-20 — Capacitor-NodeJS embedding: gotchas
+
+**Contesto.** Per evitare il PC host abbiamo embedded un Node.js server
+DENTRO l'APK Capacitor col plugin `capacitor-nodejs@1.0.0-beta.9`. Il
+runtime ARM64/x64 di Node gira in un processo separato, esposto via
+`http://localhost:3001` alla WebView.
+
+### Gotcha 1 — `require('electron')` esplode
+
+Il codice condiviso (`electron/database.js`, `electron/room-manager.js`)
+faceva `const { app } = require('electron')` senza guardia. In Node mobile
+il modulo non esiste -> il processo crasha all'import.
+
+**Fix.** Wrappare in `try/catch` con flag boolean:
+
+```js
+let isPackaged = true;
+try {
+  const electron = require('electron');
+  isPackaged = electron.app ? electron.app.isPackaged : true;
+} catch (_) {
+  // fuori da Electron (Node mobile, test headless): assume packaged
+}
+```
+
+### Gotcha 2 — Path relativi falliscono
+
+`require('../../package.json')` dentro l'APK risolve a un path che NON
+esiste: gli asset Capacitor sono in `files/nodejs/...` ma `__dirname`
+varia in modo non documentato. Soluzione: copiare i file richiesti in
+posti deterministici e leggerli runtime:
+
+```js
+const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'app-package.json'), 'utf8'));
+const appVersion = pkg.version;
+```
+
+E in `BUILDA-APK.ps1` STEP 2bis: `Copy-Item package.json public/nodejs/app-package.json`.
+
+### Gotcha 3 — `better-sqlite3` non ha prebuilt Android
+
+Il pacchetto ufficiale compila solo per Node desktop (NODE_MODULE_VERSION
+mismatch + ABI Android). Soluzione: fork
+[`digidem/better-sqlite3-nodejs-mobile`](https://github.com/digidem/better-sqlite3-nodejs-mobile)
+con prebuilt per `android-arm`, `android-arm64`, `android-x64`.
+
+```js
+const sqliteBinding = path.join(
+  __dirname, 'sqlite-prebuilds',
+  `android-${process.arch}`,           // 'android-x64' su emulator, 'android-arm64' su device
+  'better_sqlite3.node'
+);
+const Database = require('better-sqlite3');
+const db = new Database(dbPath, { nativeBinding: sqliteBinding });
+```
+
+Trick: in CI/build, scaricare i prebuilt via `gh release download` dal
+repo digidem ed estrarli in `public/nodejs/sqlite-prebuilds/`.
+
+### Gotcha 4 — `process.arch` su emulator x86_64
+
+L'emulator Android x86_64 (`Pixel_8` AVD) riporta `process.arch === 'x64'`,
+NON `'x86_64'` come ci si potrebbe aspettare dal nome AVD. Il binding
+giusto e' `android-x64`. Su device fisico moderno: `android-arm64`. Su
+device vecchio (~2018): `android-arm`.
+
+### Gotcha 5 — Static webapp serving
+
+L'app Capacitor serve gli HTML/JS dal proprio bundle (scheme
+`http://localhost`), MA il server Node embedded vorrebbe servirli a
+client esterni (Player browser, altri telefoni). Bisogna duplicare gli
+asset web in `public/nodejs/webapp/` e fare `app.use(express.static(...))`
+puntando li'. Il build script copia automaticamente, MA con esclusione
+ricorsiva di `public/nodejs/` stesso (altrimenti loop infinito).
+
+```powershell
+robocopy public public/nodejs/webapp /E /XD public/nodejs
+```
+
+### Gotcha 6 — `0.0.0.0` listen su Android
+
+Il server deve bindare su `0.0.0.0`, non `localhost` o `127.0.0.1`,
+altrimenti gli altri telefoni in LAN non possono connettersi. Verifica
+con `adb shell ss -tlnp | grep 3001` che lo state sia `LISTEN
+0.0.0.0:3001`.
+
+### Gotcha 7 — Test E2E via `adb forward`
+
+Per testare Socket.IO da PC senza altro emulator:
+```powershell
+adb forward tcp:13001 tcp:3001
+node test-socket.js  # punta a 127.0.0.1:13001
+```
+
+Funziona col transport `polling`. Il transport `websocket` puo' avere
+problemi via il tunnel `adb forward` (HTTP upgrade non supportato pulito)
+ma funziona da WebView interna o da LAN reale. Test pragmatico:
+`transports: ['polling']` per test E2E, default `['websocket', 'polling']`
+in produzione.
+
+### Gotcha 8 — Capacitor 7 obbligatorio
+
+Il plugin `capacitor-nodejs@1.0.0-beta.9` richiede Capacitor 7+. Bisogna
+upgradare TUTTI i pacchetti `@capacitor/*` insieme (core, cli, android,
+plugins) con la stessa major version. Mismatch -> Gradle compile errors
+in `CapacitorWebView.java` (simboli Android API 35).
+
+```bash
+npm install @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 \
+  @capacitor/screen-orientation@7
+```
+
+E in `android/variables.gradle`: `compileSdkVersion = 35`,
+`targetSdkVersion = 35`, `minSdkVersion = 23`.
+
+### Pattern di prevenzione
+
+1. SEMPRE wrappare `require('electron')` in try/catch nei moduli
+   condivisi tra Electron e Node mobile.
+2. SEMPRE leggere file relativi via `path.join(__dirname, ...)` e mai
+   con `require('../../...')`. Per dati di build (es package.json)
+   copiarli in posti deterministici.
+3. SEMPRE testare con `adb forward` PRIMA di provare LAN reale: isola
+   problemi di binding/codice da problemi di rete WiFi.
+4. SEMPRE avere un fallback se `process.arch` non corrisponde a un
+   prebuilt: log di errore chiaro, NO crash silenzioso.

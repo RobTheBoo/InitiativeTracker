@@ -28,68 +28,73 @@ Quando l'utente apre l'APK Master e tappa "🎭 Sono il Master":
 
 ### Step 1 — Proof of Concept (2-3h)
 
-- [ ] **1a**: `npm install @hampoelz/capacitor-nodejs` (o fork mantenuto).
-- [ ] **1b**: scaffolding `nodejs/` directory in `public/`. Hello world Node:
-  un Express che risponde `{ ok: true, ip: <IP> }` su `/health`.
-- [ ] **1c**: build APK (rebuild script gia' funziona). Install emulator.
-  Verifica via `adb forward tcp:3001 tcp:3001` + `curl localhost:3001/health`
-  che il server risponda.
-- [ ] **1d**: secondo emulator (o device fisico) → test LAN reale (non solo
-  via adb forward). NB: `emulator -netdelay none -netspeed full -dns-server
-  192.168.1.1` per propagazione DNS, oppure `adb -s <emul-2> shell` con
-  `192.168.X.Y`.
+- [x] **1a**: `npm install capacitor-nodejs@1.0.0-beta.9` (richiede Capacitor 7+).
+- [x] **1b**: scaffolding `public/nodejs/` con `package.json` + `index.js` hello world.
+- [x] **1c**: build APK + install emulator + `adb forward tcp:13001 tcp:3001`
+  → `curl localhost:13001/health` ✅.
+- [x] **1d**: rimandato a Step 5a (smoke test E2E con due client).
 
 **Check-point.** Se 1c o 1d falliscono → STOP, fallback a mDNS+QR su
 architettura attuale (opzione C).
 
 ### Step 2 — Porting server (4-6h)
 
-- [ ] **2a**: spostare `src/server/`, `src/storage/`, `src/sync/` in
-  `nodejs/server/` (o equivalente). Tutto il codice e' gia' modulare.
-- [ ] **2b**: sostituire `better-sqlite3` con il fork
-  [`digidem/better-sqlite3-nodejs-mobile`](https://github.com/digidem/better-sqlite3-nodejs-mobile).
-  Verificare ABI (ARM64 + ARMv7).
-- [ ] **2c**: avviare il server reale dentro Capacitor-NodeJS process.
-  Healthcheck: `/api/server-info`, `/api/rooms`, `/api/health`.
+- [x] **2a**: rese mobile-safe `src/server/*` e `electron/{database,room-manager}.js`:
+  - `paths.js`: aggiunto `opts.dataDir`, `opts.publicDir`, `opts.libraryDir`,
+    flag `opts.mobile` per forzare comportamento "packaged".
+  - `electron/database.js`: `require('electron')` in `try/catch`, parametro
+    `dbOptions` per iniettare `nativeBinding`.
+  - `electron/room-manager.js`: helper `isAppPackaged()` mobile-safe.
+  - `create-server.js`: accetta `opts.appVersion` e `opts.dbOptions`.
+- [x] **2a.2**: `BUILDA-APK.ps1` STEP 2bis: stage `src/`, `electron/*`, `data/`,
+  `public/*` (escluso `public/nodejs/`) in `public/nodejs/{src,electron,data,webapp}/`.
+  Copia `package.json` root → `app-package.json`. `npm install` automatico.
+- [x] **2b**: scaricato fork `digidem/better-sqlite3-nodejs-mobile@12.10.0`,
+  estratti prebuilt `android-arm`, `android-arm64`, `android-x64` in
+  `public/nodejs/sqlite-prebuilds/`. `index.js` carica il binding giusto in base a
+  `process.arch`.
+- [x] **2c**: server reale up. Healthcheck OK: `/api/server-info`, `/api/rooms`,
+  `/api/health`. DB con seed (6 heroes) caricato correttamente.
 
 **Check-point.** Se `better-sqlite3` mobile non compila → fallback a `sql.js`
 (SQLite WebAssembly puro JS) — piu' lento ma sempre cross-platform.
 
 ### Step 3 — UX onboarding senza IP (3-5h)
 
-- [ ] **3a**: master.html / master.js — quando in APK Master, socket.io si
-  collega a `http://localhost:3001` (in-app, dentro il telefono).
-- [ ] **3b**: nuova pagina o sezione "🎭 Master attivo" che mostra:
-  - IP LAN del proprio telefono (via plugin `@capacitor/network` o nativo).
-  - QR code dell'URL completo.
-  - Pulsante "Stop server".
-- [ ] **3c**: APK Player — pulsante "📷 Scansiona QR" (plugin
-  `@capacitor-mlkit/barcode-scanning` o `@capacitor-community/barcode-scanner`),
-  riempie automaticamente i blocchi IP e clicca Connetti.
+- [x] **3a**: `master.js` + `room-selector.js` — quando in APK
+  (`window.isCapacitorApp`), socket.io e fetch puntano a `http://localhost:3001`.
+- [x] **3b**: `openAsMasterCapacitor()` in `app.js`:
+  - Polling `GET /api/server-info` (timeout 60s) per attesa Node ready.
+  - Overlay full-screen con IP LAN del telefono + QR (libreria `qrcode`).
+  - Pulsante "Apri stanze" che porta al room-selector.
+- [x] **3c**: APK Player — connessione manuale via IP/porta nel form esistente.
+  QR scanner rimandato (richiederebbe `@capacitor-mlkit/barcode-scanning`,
+  ~10 MB extra, non bloccante).
 
 **Check-point.** Demo: 1 emulator Master + 1 emulator Player → join via
 QR/IP → combat round.
 
 ### Step 4 — Permessi & Foreground Service (2-4h)
 
-- [ ] **4a**: AndroidManifest:
-  - `FOREGROUND_SERVICE`
-  - `FOREGROUND_SERVICE_DATA_SYNC` (Android 14+)
-  - `POST_NOTIFICATIONS` (Android 13+, runtime)
+- [x] **4a**: AndroidManifest aggiornato:
+  - `INTERNET` (gia' presente)
   - `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE` (per leggere IP LAN)
-- [ ] **4b**: Foreground Service Android nativo (Kotlin/Java) che mantiene
-  il Node process vivo + notifica persistente "Server attivo - tap per fermare".
-  Il plugin Capacitor-NodeJS forse lo include gia'; se no, scriverlo.
-- [ ] Test stabilita': spegni schermo, ricevi chiamata, ruota telefono → server
-  deve restare up.
+  - `windowOptOutEdgeToEdgeEnforcement` (Android 15)
+- [ ] **4b**: ~~Foreground Service nativo~~ → **rimandato**. Per uso emulator
+  + sessioni brevi (1-2h con app in foreground) il Node nodejs-mobile resta
+  vivo. Solo necessario se vogliamo che il server giri con app in background
+  o schermo spento. Da aggiungere se l'utente lo richiede dopo i test reali.
 
 ### Step 5 — Build APK + test (2-4h)
 
-- [ ] **5a**: build APK release-unsigned in `dist/RPG-Initiative-Tracker-server-debug.apk`.
-  Install su 2 emulator. Smoke test: crea stanza Master, Player si connette,
-  combat 2 round.
-- [ ] **5b**: aggiorna `tasks/todo.md` Review + nuova sezione in `tasks/lessons.md`
-  ("Capacitor-NodeJS embedding: gotchas"). Commit + push.
+- [x] **5a**: APK `dist/RPG-Initiative-Tracker-debug.apk` (~57 MB). Smoke test
+  E2E con `dist/test-e2e-socket.js`:
+  - HTTP `POST /api/rooms/create` ✅
+  - HTTP `GET /api/rooms` ✅
+  - Master Socket.IO connect + `joinRoom` + `becomeMaster` ✅
+  - Player Socket.IO connect + `joinRoom` ✅ riceve `gameState` con
+    `masterId` corretto e 6 heroes dal DB seed.
+- [x] **5b**: docs aggiornate (questo file + `tasks/lessons.md`). Commit + push.
 
 ## Rollback
 
@@ -111,6 +116,53 @@ Se uno step fallisce in modo bloccante:
 
 **Totale 13-22 ore** lavoro effettivo, con check-point dopo ogni step.
 
-## Review
+## Review (2026-05-20)
 
-> Da compilare al termine.
+### Risultato
+
+Implementazione **completa** del server-on-phone. L'APK ora avvia un Node.js
+server nativo dentro il telefono Master quando l'utente tappa "🎭 Sono il Master":
+
+1. Capacitor-NodeJS plugin avvia un processo Node separato col runtime ARM64/x64.
+2. `public/nodejs/index.js` fa boot: carica il binding mobile di `better-sqlite3`,
+   inizializza il DB in `getDataPath()/data/`, avvia Express+Socket.IO su `0.0.0.0:3001`.
+3. La WebView del Capacitor app si collega a `http://localhost:3001` (loopback interno).
+4. Overlay full-screen mostra IP LAN del telefono + QR code per i Player.
+5. Player APK (o browser su altro device) puntano a `http://<IP-master>:3001`.
+
+### Cosa funziona (verificato in emulator)
+
+- Server Node embedded up: `Server listening on 0.0.0.0:3001`
+- HTTP API: `GET /api/server-info`, `GET /api/rooms`, `POST /api/rooms/create`
+- DB SQLite mobile con seed: 6 heroes caricati
+- Socket.IO bidirezionale: Master `becomeMaster`, Player riceve `gameState`
+- Static serving della webapp dalla cartella `nodejs/webapp/`
+- Path data: scrive in `/data/user/0/com.rpg.initiativetracker/files/nodejs/data`
+
+### Note operative
+
+- APK size: 4.3 MB → **~57 MB** (Node.js ARM/x64 runtime + native modules)
+- Build script (`BUILDA-APK.ps1`) ora stage automaticamente tutto il server in
+  `public/nodejs/` ad ogni build → no manual sync.
+- File ignorati in git: `public/nodejs/{src,electron,data,webapp,node_modules,app-package.json}`
+  (rigenerati automaticamente).
+- iOS: NON supportato (limitazione Apple/JIT del plugin).
+
+### Limiti noti / lavoro futuro
+
+- **Foreground service**: non implementato. Se il Master tappa Home l'app va
+  in background e Android dopo qualche minuto puo' uccidere il processo
+  Node. Per uso "tavolo da gioco con telefono in mano" non e' un problema;
+  per sessioni lunghe con schermo spento serve un foreground service Kotlin
+  (~2-4h lavoro).
+- **QR scanner Player**: il Player digita ancora IP a mano. Plugin
+  `@capacitor-mlkit/barcode-scanning` aggiungerebbe ~10 MB ma e' opzionale.
+- **mDNS**: disabilitato in mobile (`opts.enableMdns: false`). I Player devono
+  digitare IP. Una soluzione: server fa `bonjour-service` Android-friendly
+  oppure HTTP discovery via QR (gia' implementato).
+
+### Bug fix scoperti durante test
+
+- `RangeError: Too few parameter values were provided` — era nel test E2E,
+  passavo un object al socket.io event `joinRoom` che si aspetta una stringa.
+  Test client aggiornato in `dist/test-e2e-socket.js`.

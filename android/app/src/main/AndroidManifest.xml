@@ -41,4 +41,13 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- ACCESS_NETWORK_STATE / ACCESS_WIFI_STATE: il server Node embedded
+         legge gli IP delle interfacce di rete (os.networkInterfaces()) per
+         mostrare al Master il proprio IP LAN nel QR di onboarding. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- TODO: Foreground Service per garantire che il Node embedded sopravviva
+         allo screen-off / app in background. Per il PoC tenere l'app aperta
+         e' sufficiente; aggiungeremo il servizio nativo Kotlin in una phase
+         futura se serve robustezza per sessioni di gioco lunghe. -->
 </manifest>
